@@ -26,7 +26,7 @@ KubeCopilot
 
 - **核心框架**: Next.js 14 (App Router), TypeScript
     - *理由*: 全栈能力，统一前后端开发体验，完美契合我们“前端 UI + 后端安全代理/AI 编排器”的架构。
-- **UI 框架**: Tailwind CSS, shadcn/ui
+- **UI 框架**: Tailwind CSS, shadcn/ui, Magic UI
     - *理由*: 高度可定制的原子化 CSS，结合预制、符合无障碍标准的优美组件，能极大地提升开发效率和 UI 质量。
 - **状态管理**: Zustand
     - *理由*: 轻量、简洁、无模板代码。对于需要跨组件共享的状态（如当前选择的 Namespace、集群连接状态），它是最理想的选择。
@@ -135,6 +135,22 @@ kubecopilot/
     3. **拉取请求 (Pull Request - PR)**:
         - 当特性开发完成后，向 main 分支发起一个 PR。
         - 即使是独立开发，PR 也是一个强制性的步骤。它可以帮助你进行**代码自审 (Self-Review)**，确保代码质量，并为未来可能的自动化检查（CI/CD）留下入口。
+- **分支策略 (GitHub Flow)**:
+    1. `main` 分支是生产分支，永远保持可部署状态。
+        git checkout main
+        git pull origin main
+    2. 从 `main` 拉取新的 `feature/` 或 `fix/` 分支进行开发。
+        git checkout -b feature/***
+        git add .
+        git commit -m "Add *** feature"
+        git push -u origin feature/XXX(git push --set-upstream origin feature/XXX)
+    3. 开发完成后，向 `main` 分支发起 Pull Request (PR)。
+    4. PR 合并后，自动触发 Vercel 部署到生产环境。
+        git checkout main
+        git pull origin main
+    5. 删除已合并的功能分支。
+        git branch -d feature/XXX
+        git push origin --delete feature/XXX
 
 ### c. 开发环境指南
 
@@ -301,14 +317,33 @@ graph TD
 
 *目标：搭建项目骨架，实现集群连接，并**首次展示 AI 的“解释”能力**，让用户立刻感受到价值，但没有任何风险。*
 
-- [ ]  **环境搭建**:
-    - [ ]  初始化 Next.js + TypeScript 项目，集成 Tailwind, shadcn/ui。
-    - [ ]  配置好 Eslint, Prettier, Husky。
-    - [ ]  安装 `@kubernetes/client-node` 等核心依赖。
+- [x]  **环境搭建**:
+    - [x]  搭建了现代化、全栈的技术栈:
+        - [x]  项目初始化: 使用 Next.js 14 (App Router), TypeScript, Tailwind CSS 和 shadcn/ui 创建了项目骨架。
+        - [x]  依赖集成: 安装了所有核心依赖，包括 @kubernetes/client-node 用于 K8s 通信，Prisma 用于数据库交互，Zod 用于 AI 输出校验。
+    - [x]  建立了自动化的代码质量保障体系:
+        - [x]  工具链: 配置了 ESLint, Prettier, Husky 和 lint-staged。
+        - [x]  工作流: 实现了在每次 git commit 时，通过 pre-commit 钩子自动对代码进行格式化和静态检查，确保了代码库的长期整洁与规范。
+        - [x]  排错与完善: 解决了 pre-commit 钩子的默认行为问题，并据此明确了项目的分阶段测试策略。
+    - [x]  **完成了项目版本控制的初始化**:
+        - [x]  成功将项目初始化为 Git 仓库。
+        - [x]  完成了首次提交，并将项目推送到了远程仓库，为后续的协作与迭代奠定了基础。
 - [ ]  **集群连接 & 基础布局**:
-    - [ ]  `/connect` 页面，实现 Kubeconfig 粘贴连接，凭证安全存储在后端会话中。
-    - [ ]  认证中间件保护主路由。
-    - [ ]  搭建包含侧边栏和顶部栏的响应式布局。
+    - [ ]  任务 1: 创建 /connect 连接页面:
+        - [ ]  UI 开发: 使用 shadcn/ui 组件（如 Card, Label, Textarea, Button）构建一个简洁的 UI 界面。一个大的文本域（Textarea），用于让用户粘贴他们的 Kubeconfig YAML 内容。一个“连接”按钮。
+        - [ ]  （可选）提供一些提示信息，说明如何获取 Kubeconfig。
+        - [ ]  状态管理: 使用 Zustand 或 useState 来管理文本域中的 Kubeconfig 内容。
+    - [ ]  任务 2: 实现后端连接 API (/api/k8s/connect):
+        - [ ]  API 路由: 创建一个 Next.js API Route，用于接收前端提交的 Kubeconfig 字符串。
+        - [ ]  服务端验证: 在后端，使用 @kubernetes/client-node 库来解析这个 Kubeconfig 字符串。尝试用解析出的凭证初始化一个 Kubernetes API 客户端实例。执行一个简单的、只读的 API 调用（例如 listNamespace 或 getComponentStatus）来验证凭证的有效性和与集群的连通性。
+        - [ ]  会话管理 (简化版):如果验证成功，将这个 Kubeconfig 内容安全地存储在服务端的会话中（初期我们可以使用一个简单的内存存储或加密的 Cookie）。严禁将 Kubeconfig 返回或存储在前端。如果验证失败，返回一个明确的错误信息。
+    - [ ]  任务 3: 实现连接后的跳转与认证保护:
+        - [ ]  前端逻辑: 当用户点击“连接”并收到后端的成功响应后，使用 Next.js 的 useRouter 将页面重定向到 /dashboard。
+        - [ ]  认证中间件 (Middleware): 创建一个 Next.js Middleware，用于保护 (dashboard) 路由组下的所有页面。这个中间件会检查用户的会话中是否存在有效的集群连接凭证。如果不存在，就将其重定向回 /connect 页面。
+    - [ ]  任务 4: 搭建基础仪表盘布局 ((dashboard)/layout.tsx):
+        - [ ]  UI 框架: 创建一个包含侧边栏 (Sidebar) 和顶部栏 (Header) 的基础响应式布局。
+        - [ ]  侧边栏: 暂时放置一些静态链接，指向我们未来将要开发的页面（如 Namespaces, Pods, Deployments）。
+        - [ ]  内容区域: 布局中应包含一个主内容区域，用于渲染各个页面（例如 /dashboard 的概览页）。
 - [ ]  **核心资源浏览 (只读)**:
     - [ ]  实现 Namespaces, Pods, Deployments, Services 的列表页和详情页。
     - [ ]  详情页包含基础信息、事件和**只读 YAML**。

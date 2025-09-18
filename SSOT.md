@@ -126,10 +126,11 @@ kubecopilot/
         - feat(api): implement operation plan generation endpoint
         - fix(ui): correct pod status badge color
         - docs(ssot): refine sre principles section
+        - test(husky)：增加测试
     - **理由**: 规范化的 Commit Message 能极大地提高 Git Log 的可读性，便于快速理解每次提交的内容。更重要的是，它可以为自动化工具（如 semantic-release）所用，实现**自动化生成 CHANGELOG 和版本号管理**，这是 DevOps 最佳实践的一部分。
 - **规则**:
     1. **main 分支**: 这是项目的主分支，永远处于**可部署**状态。不允许直接 push，所有合并必须通过 Pull Request。
-    2. **特性分支 (Feature Branches)**:
+    2. **特性分支 (feat Branches)**:
         - 任何新的功能或修复，都必须从 main 分支创建一个新的特性分支。
         - 分支命名规范: feat/login-page, fix/pod-list-bug, refactor/api-client。
     3. **拉取请求 (Pull Request - PR)**:
@@ -139,18 +140,18 @@ kubecopilot/
     1. `main` 分支是生产分支，永远保持可部署状态。
         git checkout main
         git pull origin main
-    2. 从 `main` 拉取新的 `feature/` 或 `fix/` 分支进行开发。
-        git checkout -b feature/***
+    2. 从 `main` 拉取新的 `feat/` 或 `fix/` 分支进行开发。
+        git checkout -b feat/***
         git add .
-        git commit -m "Add *** feature"
-        git push -u origin feature/XXX(git push --set-upstream origin feature/XXX)
+        git commit -m "Add *** feat"
+        git push -u origin feat/XXX(git push --set-upstream origin feat/XXX)
     3. 开发完成后，向 `main` 分支发起 Pull Request (PR)。
     4. PR 合并后，自动触发 Vercel 部署到生产环境。
         git checkout main
         git pull origin main
     5. 删除已合并的功能分支。
-        git branch -d feature/XXX
-        git push origin --delete feature/XXX
+        git branch -d feat/XXX
+        git push origin --delete feat/XXX
 
 ### c. 开发环境指南
 
@@ -261,6 +262,7 @@ graph TD
 - **AI 编排器 (AI Orchestrator)**: 核心大脑。接收来自前端的自然语言或操作意图，调用 LLM 生成结构化数据（如诊断、`OperationPlan`），并与风险引擎和审计模块交互。
 - **风险引擎 (Risk Engine)**: 根据预设规则和 AI 评分，为 `OperationPlan` 评定风险等级，并决定是否需要人工确认。
 - **审计存储 (Audit Store)**: 记录所有重要操作，尤其是 AI 生成的计划和用户的确认行为，提供不可篡改的追溯依据。
+- **[未来考量]**: 为支持未来的高可用部署，会话存储需要从内存模式平滑升级到外部共享存储模式（如 Redis）。
 
 # 9. 核心数据结构:OperationPlan
 
@@ -303,9 +305,14 @@ graph TD
 
 ```
 
-- **补充说明**: diff.before 字段必须在**生成 OperationPlan 的那一刻**，通过向 K8s API Server 查询资源的**当前状态**来填充。diff.after 则是根据用户意图和当前状态计算出的**期望状态**。
-- **理由**: 这强调了一个关键的实现细节。如果不在生成计划时就固定 before 状态，那么从计划生成到用户确认的这段时间内，资源的真实状态可能又发生了变化，这会导致执行结果与预期不符。固定 diff 快照是保证操作确定性的重要一环。
-- 时间戳字段为“审计”和“事后复盘”提供了精确到毫秒的关键证据链。我们可以清晰地知道一个计划从被创建、被确认到被执行分别花费了多长时间。
+- **补充说明 1**: 
+    - diff.before 字段必须在**生成 OperationPlan 的那一刻**，通过向 K8s API Server 查询资源的**当前状态**来填充。diff.after 则是根据用户意图和当前状态计算出的**期望状态**。
+    - 时间戳字段为“审计”和“事后复盘”提供了精确到毫秒的关键证据链。我们可以清晰地知道一个计划从被创建、被确认到被执行分别花费了多长时间。
+    - **理由**: 这强调了一个关键的实现细节。如果不在生成计划时就固定 before 状态，那么从计划生成到用户确认的这段时间内，资源的真实状态可能又发生了变化，这会导致执行结果与预期不符。固定 diff 快照是保证操作确定性的重要一环。
+- **补充说明 2**: 
+    - **Pre-Execution Check (执行前终态检查)**: 在执行 /api/ai/execute 时，系统必须在执行操作前，重新从 K8s API 获取资源的当前状态，并与 OperationPlan.diff.before 快照进行对比。若不一致，必须中止操作并向用户报告。
+    - **Action Whitelist (操作白名单)**: AI 编排器在生成 OperationPlan 后，必须根据一个硬编码的 (action, resource.kind) 白名单进行校验。例如，初期白名单可能只包含 ('restart', 'Deployment'), ('scale', 'Deployment')。任何不在白名单内的计划都将被拒绝。
+    - **理由**: 这两条原则是“安全默认”设计哲学的具体代码实现，能从根本上杜绝状态漂移和 AI “越权”操作带来的风险，是我们构建可信赖写操作的基石。
 
 # **10. 开发路线图 (Revised Roadmap)**
 
@@ -327,7 +334,7 @@ graph TD
         - [x]  排错与完善: 解决了 pre-commit 钩子的默认行为问题，并据此明确了项目的分阶段测试策略。
     - [x]  **完成了项目版本控制的初始化**:
         - [x]  成功将项目初始化为 Git 仓库。
-        - [x]  完成了首次提交，并将项目推送到了远程仓库，为后续的协作与迭代奠定了基础。
+        - [x]  完成了首次提交，并将项目推送到了远程仓库。
 - [ ]  **集群连接 & 基础布局**:
     - [ ]  任务 1: 创建 /connect 连接页面:
         - [ ]  UI 开发: 使用 shadcn/ui 组件（如 Card, Label, Textarea, Button）构建一个简洁的 UI 界面。一个大的文本域（Textarea），用于让用户粘贴他们的 Kubeconfig YAML 内容。一个“连接”按钮。
@@ -349,7 +356,7 @@ graph TD
     - [ ]  详情页包含基础信息、事件和**只读 YAML**。
 - [ ]  **AI 洞察 MVP (AI Insight MVP)**:
     - [ ]  在 Pod 详情页，添加一个“**AI 诊断**”按钮。
-    - [ ]  后端 API (`/api/ai/diagnose/pod`) 接收 Pod 名称，获取其 `describe` 信息、`events` 和最新的 `logs`。
+    - [ ]  后端 API (`/api/ai/diagnose/pod`) 接收 Pod 名称，获取其 `describe` 信息、`events` 和最新的200 行`logs`。
     - [ ]  将上述信息作为上下文，调用 LLM Provider，要求其返回一个结构化的 JSON，分析 Pod 的当前状态、潜在问题和建议。
     - [ ]  前端将这个结构化的诊断结果美观地展示出来。
 - **阶段成果**: 一个功能完善的 K8s Dashboard，但它多了一个“会说话”的诊断功能。

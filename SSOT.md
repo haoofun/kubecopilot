@@ -22,6 +22,29 @@ KubeCopilot
 - **Gemini (AI in this web chat)**: AI 架构师 & 系统设计师 (AI Architect & System Designer)。
 - **本地 IDE AI (Copilot, etc.)**: AI 结对程序员 (AI Pair Programmer)。
 
+### 3.1 AI 协作模型 (AI Collaboration Model)
+
+- **目标**: 为解决 AI 无法直接访问本地代码库导致的上下文缺失问题，并提升长期协作效率，我们采纳一个**分层协作模型**，为不同的协作场景指定最高效的工具。
+
+- **模型分层**:
+    1.  **Gemini (Web Chat) - 战略指挥室 (Strategy Room)**:
+        - **职责**: 负责 SSOT 的维护、高阶架构设计、Roadmap 规划、核心技术决策和方向性问题的讨论。
+        - **定位**: 定义项目的 **“Why”** 和 **“What”**。
+
+    2.  **本地 IDE AI (VS Code w/ AI, GitHub Copilot) - 结对程序员 (Pair Programmer)**:
+        - **职责**: 在 IDE 中提供实时的代码自动补全、函数生成、代码片段解释和重构建议。
+        - **定位**: 辅助完成 **“How”** 的一线编码工作，它拥有完整的本地文件上下文。
+
+    3.  **Gemini CLI - 代码审查员 (Code Reviewer)**:
+        - **职责**: 在不离开终端的情况下，对单个或多个本地文件进行按需的、指令式的深度分析、审查和优化。
+        - **定位**: 解决“需要架构师审查本地代码，但又不想复制粘贴”的场景，是连接本地开发与战略审查的桥梁。
+
+- **推荐工作流**:
+    1.  **规划 (Web Chat)**: 在战略指挥室中共同确定下一个开发任务。
+    2.  **编码 (IDE)**: 在本地使用 AI 结对程序员高效编写代码。
+    3.  **审查 (CLI)**: (可选) 当需要对特定实现进行反馈时，使用 CLI 让 AI 对本地代码进行审查。
+    4.  **同步 (Web Chat)**: 完成任务后，在战略指挥室同步进度，并规划下一步行动。
+
 # 4. 技术栈 (Tech Stack)
 
 - **核心框架**: Next.js 14 (App Router), TypeScript
@@ -170,6 +193,9 @@ kubecopilot/
 - **编辑器/IDE**: 推荐使用支持远程开发的编辑器，如 **VS Code (with WSL Extension)** 或 **Zed**。通过在 WSL2 终端的项目目录中运行 `code .` 或 `zed .` 来启动，以获得最佳的集成体验。
 - **核心工具链**: **所有开发工具链 (Node.js, npm, Docker CLI) 都必须独立安装在 WSL2 内部**，推荐使用 `nvm` 管理 Node.js 版本。严禁混用或依赖 Windows 中安装的工具链，以避免“环境污染”导致的路径和兼容性问题。
 - **本地 K8s 集群**: 使用 **k3d** 在 WSL2 内部的 Docker 中创建和管理轻量级 K3s 集群。这提供了快速、隔离、可复现的测试环境，完美契合 CI/CD 和自动化测试的需求。
+        - 创建开发集群: 使用以下命令创建一个专用于 KubeCopilot 开发的集群：k3d cluster create kubecopilot-dev
+        - 获取 Kubeconfig: 要获取用于连接的 Kubeconfig 内容，请运行：k3d kubeconfig get kubecopilot-dev
+        - 清理集群: 当不再需要时，可以使用以下命令删除集群以释放资源：k3d cluster delete kubecopilot-dev
 - **环境一致性原则 (Principle of Environmental Congruence)**: 开发环境必须与目标生产环境（Linux）保持高度一致。我们坚持在 WSL2 内部进行所有开发，使用原生的 Linux 工具链。这一原则旨在从根源上消除“在我机器上能跑”的问题，确保我们构建的软件健壮、可靠，并符合 DevOps 最佳实践。
 
 ### e. 测试策略 (Testing Strategy)
@@ -185,6 +211,19 @@ kubecopilot/
 - **测试运行器**: `Jest` 或 `Vitest`
 - **前端组件测试**: `React Testing Library`
 - **端到端测试**: `Playwright` (推荐) 或 `Cypress`
+
+### f. 前端 UI 迭代策略 (Frontend UI Iteration Strategy)
+
+- **核心原则**: 为践行“开发者体验至上 (DX First)”并允许未来对 UI 进行持续打磨，我们采用**“逻辑与视图分离”**的组件设计策略。
+- **实施方案**:
+    - **逻辑层 (Logic Layer)**: 指的是组件内的 React Hooks (`useState`, `useEffect`), 状态管理 (`Zustand`) 以及事件处理函数 (`handleConnect` 等)。这是组件的“大脑”，负责状态管理和业务流程，应保持稳定。
+    - **视图层 (View Layer)**: 指的是组件 `return()` 语句中的 JSX 结构，由 `shadcn/ui` 或其他 UI 元素构成。这是组件的“皮肤”，可以被灵活替换和美化。
+- **迭代工作流**:
+    1.  **设计**: 使用 Figma, Stitch 等工具设计新的 UI 界面。
+    2.  **开发**: 编写或生成新的视图层 (JSX) 代码。
+    3.  **替换**: 在对应的组件文件中，**仅替换 `return()` 内的 JSX 部分**，保留顶部的逻辑层代码。
+    4.  **重绑**: 将逻辑层中的状态和事件处理器（如 `value`, `onChange`, `onClick`）重新绑定到新的 JSX 元素上。
+- **优势**: 此策略确保了我们可以低风险、高效率地对产品 UI 进行迭代和优化，而无需重写已经稳定的核心业务逻辑。
 
 
 # **7. SRE 核心思想与实践 (SRE Core Philosophy & Practices)**
@@ -337,7 +376,8 @@ graph TD
         - [x]  完成了首次提交，并将项目推送到了远程仓库。
 - [ ]  **集群连接 & 基础布局**:
     - [ ]  任务 1: 创建 /connect 连接页面:
-        - [ ]  UI 开发: 使用 shadcn/ui 组件（如 Card, Label, Textarea, Button）构建一个简洁的 UI 界面。一个大的文本域（Textarea），用于让用户粘贴他们的 Kubeconfig YAML 内容。一个“连接”按钮。
+        - [x]  UI 开发: 使用 shadcn/ui 组件（如 Card, Label, Textarea, Button）构建一个简洁的 UI 界面。一个大的文本域（Textarea），用于让用户粘贴他们的 Kubeconfig YAML 内容。一个“连接”按钮。
+        - [ ]  UI 增强: 增加文件上传按钮，在前端解析文件内容并填充到文本域。
         - [ ]  （可选）提供一些提示信息，说明如何获取 Kubeconfig。
         - [ ]  状态管理: 使用 Zustand 或 useState 来管理文本域中的 Kubeconfig 内容。
     - [ ]  任务 2: 实现后端连接 API (/api/k8s/connect):

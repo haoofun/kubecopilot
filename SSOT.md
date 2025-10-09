@@ -374,23 +374,23 @@ graph TD
     - [x]  **完成了项目版本控制的初始化**:
         - [x]  成功将项目初始化为 Git 仓库。
         - [x]  完成了首次提交，并将项目推送到了远程仓库。
-- [ ]  **集群连接 & 基础布局**:
-    - [ ]  任务 1: 创建 /connect 连接页面:
+- [x]  **集群连接 & 基础布局**:
+    - [x]  任务 1: 创建 /connect 连接页面:
         - [x]  UI 开发: 使用 shadcn/ui 组件（如 Card, Label, Textarea, Button）构建一个简洁的 UI 界面。一个大的文本域（Textarea），用于让用户粘贴他们的 Kubeconfig YAML 内容。一个“连接”按钮。
         - [ ]  UI 增强: 增加文件上传按钮，在前端解析文件内容并填充到文本域。
         - [ ]  （可选）提供一些提示信息，说明如何获取 Kubeconfig。
-        - [ ]  状态管理: 使用 Zustand 或 useState 来管理文本域中的 Kubeconfig 内容。
-    - [ ]  任务 2: 实现后端连接 API (/api/k8s/connect):
-        - [ ]  API 路由: 创建一个 Next.js API Route，用于接收前端提交的 Kubeconfig 字符串。
-        - [ ]  服务端验证: 在后端，使用 @kubernetes/client-node 库来解析这个 Kubeconfig 字符串。尝试用解析出的凭证初始化一个 Kubernetes API 客户端实例。执行一个简单的、只读的 API 调用（例如 listNamespace 或 getComponentStatus）来验证凭证的有效性和与集群的连通性。
-        - [ ]  会话管理 (简化版):如果验证成功，将这个 Kubeconfig 内容安全地存储在服务端的会话中（初期我们可以使用一个简单的内存存储或加密的 Cookie）。严禁将 Kubeconfig 返回或存储在前端。如果验证失败，返回一个明确的错误信息。
-    - [ ]  任务 3: 实现连接后的跳转与认证保护:
-        - [ ]  前端逻辑: 当用户点击“连接”并收到后端的成功响应后，使用 Next.js 的 useRouter 将页面重定向到 /dashboard。
-        - [ ]  认证中间件 (Middleware): 创建一个 Next.js Middleware，用于保护 (dashboard) 路由组下的所有页面。这个中间件会检查用户的会话中是否存在有效的集群连接凭证。如果不存在，就将其重定向回 /connect 页面。
-    - [ ]  任务 4: 搭建基础仪表盘布局 ((dashboard)/layout.tsx):
-        - [ ]  UI 框架: 创建一个包含侧边栏 (Sidebar) 和顶部栏 (Header) 的基础响应式布局。
-        - [ ]  侧边栏: 暂时放置一些静态链接，指向我们未来将要开发的页面（如 Namespaces, Pods, Deployments）。
-        - [ ]  内容区域: 布局中应包含一个主内容区域，用于渲染各个页面（例如 /dashboard 的概览页）。
+        - [x]  状态管理: 使用 Zustand 或 useState 来管理文本域中的 Kubeconfig 内容。
+    - [x]  任务 2: 实现后端连接 API (/api/k8s/connect):
+        - [x]  API 路由: 创建一个 Next.js API Route，用于接收前端提交的 Kubeconfig 字符串。
+        - [x]  服务端验证: 在后端，使用 @kubernetes/client-node 库来解析这个 Kubeconfig 字符串。尝试用解析出的凭证初始化一个 Kubernetes API 客户端实例。执行一个简单的、只读的 API 调用（例如 listNamespace 或 getComponentStatus）来验证凭证的有效性和与集群的连通性。
+        - [x]  会话管理 (简化版):如果验证成功，将这个 Kubeconfig 内容安全地存储在服务端的会话中（初期我们可以使用一个简单的内存存储或加密的 Cookie）。严禁将 Kubeconfig 返回或存储在前端。如果验证失败，返回一个明确的错误信息。
+    - [x]  任务 3: 实现连接后的跳转与认证保护:
+        - [x]  前端逻辑: 当用户点击“连接”并收到后端的成功响应后，使用 Next.js 的 useRouter 将页面重定向到 /dashboard。
+        - [x]  认证中间件 (Middleware): 创建一个 Next.js Middleware，用于保护 (dashboard) 路由组下的所有页面。这个中间件会检查用户的会话中是否存在有效的集群连接凭证。如果不存在，就将其重定向回 /connect 页面。
+    - [x]  任务 4: 搭建基础仪表盘布局 ((dashboard)/layout.tsx):
+        - [x]  UI 框架: 创建一个包含侧边栏 (Sidebar) 和顶部栏 (Header) 的基础响应式布局。
+        - [x]  侧边栏: 暂时放置一些静态链接，指向我们未来将要开发的页面（如 Namespaces, Pods, Deployments）。
+        - [x]  内容区域: 布局中应包含一个主内容区域，用于渲染各个页面（例如 /dashboard 的概览页）。
 - [ ]  **核心资源浏览 (只读)**:
     - [ ]  实现 Namespaces, Pods, Deployments, Services 的列表页和详情页。
     - [ ]  详情页包含基础信息、事件和**只读 YAML**。

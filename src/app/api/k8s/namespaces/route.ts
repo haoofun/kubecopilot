@@ -1,11 +1,11 @@
 import { NextResponse, NextRequest } from 'next/server'
-import { getK8sApiWithSession } from '@/lib/k8s/client'
+import { getK8sCoreV1Api } from '@/lib/k8s/client'
 import { V1Namespace } from '@kubernetes/client-node'
 
 export async function GET(request: NextRequest) {
   try {
     const sessionId = request.cookies.get('k8s-session-id')?.value
-    const k8sApi = getK8sApiWithSession(sessionId)
+    const k8sApi = getK8sCoreV1Api(sessionId)
 
     const response = await k8sApi.listNamespace()
     const namespaces = response.items

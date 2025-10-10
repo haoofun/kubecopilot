@@ -103,7 +103,10 @@ kubecopilot/
 │   │       │   ├── execute/    # 执行已确认的 OperationPlan
 │   │       │   └── plan/       # 根据用户意图生成 OperationPlan
 │   │       └── k8s/            # 作为安全代理，转发请求到 K8s API Server
-│   │           └── [..path]/   # 动态路由，匹配所有 K8s API 路径
+│   │           ├── namespaces/ # 【MVP 策略】为每个资源创建特定路由，以实现安全可控和数据定制化
+│   │           ├── pods/
+│   │           └── ...
+│   │           # [未来 V2] 可能会演进为 [..path] 动态代理模式，以支持更广泛的资源类型
 │   ├── components/
 │   │   ├── ai/               # AI 专属 UI 组件 (例如 PromptBar, PlanConfirmModal, AiDiagnosisPane)
 │   │   ├── ui/               # shadcn/ui 基础组件 (由 CLI 生成)

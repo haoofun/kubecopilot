@@ -26,7 +26,7 @@ export default function ConnectPage() {
 
   const handleConnect = async () => {
     setIsLoading(true)
-    setError(null) // 重置错误状态
+    setError(null)
 
     try {
       const response = await fetch('/api/k8s/connect', {
@@ -37,19 +37,24 @@ export default function ConnectPage() {
         body: JSON.stringify({ kubeconfig }),
       })
 
+      // 解析 JSON 响应体，无论成功或失败
+      const data = await response.json()
+
       if (!response.ok) {
-        // 如果响应状态码不是 2xx，则解析错误信息
-        const errorData = await response.json()
-        throw new Error(errorData.message || 'An unknown error occurred.')
+        // 从后端返回的 JSON 中提取更详细的错误信息
+        throw new Error(
+          data.error || data.message || 'An unknown error occurred.',
+        )
       }
 
-      // 如果连接成功，跳转到 dashboard
-      router.push('/') // 或 '/dashboard'
-    } catch (err) {
+      // 成功后跳转
+      router.push('/')
+    } catch (err: unknown) {
+      console.error('Frontend Connect Error:', err) // 在浏览器控制台打印详细错误
       if (err instanceof Error) {
         setError(err.message)
       } else {
-        setError(String(err))
+        setError('An unknown error occurred.')
       }
     } finally {
       setIsLoading(false)

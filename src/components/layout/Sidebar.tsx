@@ -13,6 +13,7 @@ export function Sidebar() {
     { href: '/pods', label: 'Pods', icon: Box },
     { href: '/deployments', label: 'Deployments', icon: Server },
     { href: '/services', label: 'Services', icon: Network },
+    { href: '/namespaces', label: 'Namespaces', icon: Box },
   ]
 
   return (

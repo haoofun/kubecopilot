@@ -84,7 +84,6 @@ KubeCopilot
 # 5. 项目结构 (Project Structure)
 
 ```
-
 kubecopilot/
 ├── prisma/                 # Prisma 目录，存放数据库 Schema 和迁移文件
 │   └── schema.prisma
@@ -302,6 +301,28 @@ graph TD
 - **风险引擎 (Risk Engine)**: 根据预设规则和 AI 评分，为 `OperationPlan` 评定风险等级，并决定是否需要人工确认。
 - **审计存储 (Audit Store)**: 记录所有重要操作，尤其是 AI 生成的计划和用户的确认行为，提供不可篡改的追溯依据。
 - **[未来考量]**: 为支持未来的高可用部署，会话存储需要从内存模式平滑升级到外部共享存储模式（如 Redis）。
+
+
+### 8.1 核心架构原则 (Core Architecture Principles)
+
+这些原则是我们所有后端代码设计和重构的最高准则，旨在确保代码库的长期健康、可维护性和安全性。
+
+1.  **DRY (Don't Repeat Yourself - 不要重复自己)**
+    - **定义**: 任何一段知识（代码逻辑、配置）在系统中都应该有单一、无歧义、权威的表示。
+    - **KubeCopilot 实践**:
+        - **会话管理**: 所有与会话存储（`sessionStore`）的交互逻辑，必须被封装在共享模块中（如 `/lib/session.ts`）。API 路由本身不应直接实现会话存储。
+        - **K8s 客户端实例化**: 创建 Kubernetes API 客户端的逻辑（包括从会话获取凭证、加载 Kubeconfig、实例化客户端）必须被封装成一个可复用的工厂函数（如 `getK8sApiWithSession`）。API 路由只负责调用此函数，不关心实现细节。
+
+2.  **关注点分离 (Separation of Concerns)**
+    - **定义**: 不同的功能模块应该处理不同的事情，并尽量减少彼此之间的重叠。
+    - **KubeCopilot 实践**:
+        - **API 路由层 (`/app/api/**`)**: 其唯一职责是处理 HTTP 请求和响应。包括：解析请求、调用业务逻辑、格式化响应数据和处理 HTTP 错误。
+        - **业务逻辑层 (`/lib/**`)**: 包含核心的、可复用的业务逻辑。例如，与 K8s 的交互、AI 编排、数据库操作等。这一层应该是“纯粹的”，不应包含任何 `NextRequest` 或 `NextResponse` 相关的代码。
+
+3.  **数据最小化原则 (Data Minimization)**
+    - **定义**: API 端点应只返回前端明确需要的字段，而不是将从上游（如 K8s API）获取的整个庞大对象直接透传。
+    - **KubeCopilot 实践**:
+        - 在每个数据获取 API (如 `/api/k8s/namespaces`) 的最后一步，必须有一个明确的 `map` 或转换操作，从完整的 K8s 资源对象中，只挑选出 UI 需要的字段（如 `name`, `status`, `creationTimestamp`）来构建响应体。
 
 # 9. 核心数据结构:OperationPlan
 

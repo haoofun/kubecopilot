@@ -10,6 +10,8 @@ import {
 } from '@/components/ui/table'
 import { useK8sResource } from '@/hooks/useK8sResource'
 import { Skeleton } from '@/components/ui/skeleton' // 我们需要骨架屏
+import Link from 'next/link'
+import { Alert, AlertDescription } from '../ui/alert'
 
 // 定义 Namespace 数据的 TypeScript 类型
 interface Namespace {
@@ -27,7 +29,13 @@ export function NamespaceTable() {
   } = useK8sResource<Namespace[]>('namespaces')
 
   if (isError) {
-    return <div className="text-red-500">Failed to load namespaces.</div>
+    return (
+      <Alert variant="destructive">
+        <AlertDescription>
+          {isError?.message || 'Failed to load namespaces.'}
+        </AlertDescription>
+      </Alert>
+    )
   }
 
   return (
@@ -58,7 +66,14 @@ export function NamespaceTable() {
           : // 数据加载完成后，显示真实数据
             namespaces?.map((ns) => (
               <TableRow key={ns.name}>
-                <TableCell className="font-medium">{ns.name}</TableCell>
+                <TableCell className="font-medium">
+                  <Link
+                    href={`/namespaces/${ns.name}`}
+                    className="text-primary hover:underline"
+                  >
+                    {ns.name}
+                  </Link>
+                </TableCell>
                 <TableCell>{ns.status}</TableCell>
                 <TableCell>{ns.creationTimestamp}</TableCell>
                 {/* TODO: Format the timestamp to a human-readable "Age" (e.g., "2 days ago") */}

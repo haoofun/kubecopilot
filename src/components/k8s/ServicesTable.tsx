@@ -10,6 +10,8 @@ import {
 } from '@/components/ui/table'
 import { useK8sResource } from '@/hooks/useK8sResource'
 import { Skeleton } from '@/components/ui/skeleton'
+import Link from 'next/link'
+import { Alert, AlertDescription } from '../ui/alert'
 
 interface Service {
   name: string
@@ -28,7 +30,13 @@ export function ServicesTable() {
   } = useK8sResource<Service[]>('services')
 
   if (isError) {
-    return <div className="text-red-500">Failed to load services.</div>
+    return (
+      <Alert variant="destructive">
+        <AlertDescription>
+          {isError?.message || 'Failed to load services.'}
+        </AlertDescription>
+      </Alert>
+    )
   }
 
   return (
@@ -69,7 +77,14 @@ export function ServicesTable() {
             ))
           : services?.map((svc) => (
               <TableRow key={`${svc.namespace}-${svc.name}`}>
-                <TableCell className="font-medium">{svc.name}</TableCell>
+                <TableCell className="font-medium">
+                  <Link
+                    href={`/services/${svc.namespace}/${svc.name}`}
+                    className="text-primary hover:underline"
+                  >
+                    {svc.name}
+                  </Link>
+                </TableCell>
                 <TableCell>{svc.namespace}</TableCell>
                 <TableCell>{svc.type}</TableCell>
                 <TableCell>{svc.clusterIP}</TableCell>

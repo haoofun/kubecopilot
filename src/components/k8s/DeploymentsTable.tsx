@@ -10,6 +10,8 @@ import {
 } from '@/components/ui/table'
 import { useK8sResource } from '@/hooks/useK8sResource'
 import { Skeleton } from '@/components/ui/skeleton'
+import Link from 'next/link'
+import { Alert, AlertDescription } from '../ui/alert'
 
 interface Deployment {
   name: string
@@ -28,7 +30,14 @@ export function DeploymentsTable() {
   } = useK8sResource<Deployment[]>('deployments')
 
   if (isError) {
-    return <div className="text-red-500">Failed to load deployments.</div>
+    return (
+      <Alert variant="destructive">
+        <AlertDescription>
+          {isError?.message + 'Failed to load deployments.' ||
+            'Failed to load deployments.'}
+        </AlertDescription>
+      </Alert>
+    )
   }
 
   return (
@@ -69,7 +78,14 @@ export function DeploymentsTable() {
             ))
           : deployments?.map((dep) => (
               <TableRow key={`${dep.namespace}-${dep.name}`}>
-                <TableCell className="font-medium">{dep.name}</TableCell>
+                <TableCell className="font-medium">
+                  <Link
+                    href={`/deployments/${dep.namespace}/${dep.name}`}
+                    className="text-primary hover:underline"
+                  >
+                    {dep.name}
+                  </Link>
+                </TableCell>
                 <TableCell>{dep.namespace}</TableCell>
                 <TableCell>{dep.ready}</TableCell>
                 <TableCell>{dep.upToDate}</TableCell>

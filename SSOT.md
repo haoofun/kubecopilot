@@ -83,6 +83,7 @@ KubeCopilot
 
 # 5. 项目结构 (Project Structure)
 
+## **5.1 规划的项目结构**
 ```
 kubecopilot/
 ├── prisma/                 # Prisma 目录，存放数据库 Schema 和迁移文件
@@ -130,6 +131,19 @@ kubecopilot/
 ├── next.config.mjs         # Next.js 配置文件
 └── tsconfig.json           # TypeScript 配置文件```
 ```
+
+## **5.2 已实现的核心组件与模式**
+
+本节记录项目在代码层面已实现的关键抽象和可复用单元，以反映当前工程进度。
+后端:   
+    - [x]  K8s 客户端工厂: 在 /lib/k8s/client.ts 中实现了基于 API Group 的客户端创建模式 (getK8sCoreV1Api, getK8sAppsV1Api)。
+    - [x]  会话管理: 实现了基于 globalThis 的内存会话存储，确保开发环境的热重载稳定性。
+    - [x]  特定资源 API 路由: 确立了为每个 K8s 资源创建独立、安全、定制化 API 路由的模式。
+前端:
+    - [x]  通用数据获取 Hook: 在 /hooks/useK8sResource.ts 中实现了基于 SWR 的通用数据获取 Hook。
+    - [x]  可复用详情页组件: 创建了 EventsTable, ReadOnlyYamlViewer 等可被多个资源详情页复用的核心组件。
+    - [x]  Tabs 布局模式: 确立了使用 Tabs 组件来组织详情页信息的标准布局。
+
 
 # **6. 开发工作流 (Development Workflow)**
 

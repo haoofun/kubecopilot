@@ -10,6 +10,7 @@ import {
 } from '@/components/ui/table'
 import { useK8sResource } from '@/hooks/useK8sResource'
 import { Skeleton } from '@/components/ui/skeleton'
+import Link from 'next/link'
 
 interface Pod {
   name: string
@@ -60,7 +61,14 @@ export function PodsTable() {
             ))
           : pods?.map((pod) => (
               <TableRow key={`${pod.namespace}-${pod.name}`}>
-                <TableCell className="font-medium">{pod.name}</TableCell>
+                <TableCell className="font-medium">
+                  <Link
+                    href={`/pods/${pod.namespace}/${pod.name}`}
+                    className="text-primary hover:underline"
+                  >
+                    {pod.name}
+                  </Link>
+                </TableCell>
                 <TableCell>{pod.namespace}</TableCell>
                 <TableCell>{pod.status}</TableCell>
                 <TableCell>{pod.restarts}</TableCell>

@@ -314,7 +314,9 @@ graph TD
     - **定义**: 任何一段知识（代码逻辑、配置）在系统中都应该有单一、无歧义、权威的表示。
     - **KubeCopilot 实践**:
         - **会话管理**: 所有与会话存储（`sessionStore`）的交互逻辑，必须被封装在共享模块中（如 `/lib/session.ts`）。API 路由本身不应直接实现会话存储。
-        - **K8s 客户端实例化**: 创建 Kubernetes API 客户端的逻辑（包括从会话获取凭证、加载 Kubeconfig、实例化客户端）必须被封装成一个可复用的工厂函数（如 `getK8sApiWithSession`）。API 路由只负责调用此函数，不关心实现细节。
+        - **K8s 客户端实例化**: 创建 Kubernetes API 客户端的逻辑必须被封装在 /lib/k8s/client.ts 中。
+            - **核心工厂 (loadKubeConfig)**: 必须存在一个核心的、可复用的工厂函数，其唯一职责是根据会话 ID 加载并返回一个经过认证的 KubeConfig 对象。
+            - **专用客户端函数**: 针对不同的 Kubernetes API Group（如 CoreV1Api, AppsV1Api），必须创建独立的、具名的导出函数（如 getK8sCoreV1Api, getK8sAppsV1Api）。这些函数内部都应调用核心的 loadKubeConfig 工厂，以确保逻辑的一致性和代码的 DRY 原则。当前使用sessionId来获取。
 
 2.  **关注点分离 (Separation of Concerns)**
     - **定义**: 不同的功能模块应该处理不同的事情，并尽量减少彼此之间的重叠。
@@ -415,9 +417,17 @@ graph TD
         - [x]  UI 框架: 创建一个包含侧边栏 (Sidebar) 和顶部栏 (Header) 的基础响应式布局。
         - [x]  侧边栏: 暂时放置一些静态链接，指向我们未来将要开发的页面（如 Namespaces, Pods, Deployments）。
         - [x]  内容区域: 布局中应包含一个主内容区域，用于渲染各个页面（例如 /dashboard 的概览页）。
-- [ ]  **核心资源浏览 (只读)**:
-    - [ ]  实现 Namespaces, Pods, Deployments, Services 的列表页和详情页。
-    - [ ]  详情页包含基础信息、事件和**只读 YAML**。
+- [x]  **核心资源浏览 (只读) - 列表页**:
+    - [x]  搭建了可复用的数据获取模式 (useK8sResource Hook) 和 UI 组件 (Table, Skeleton)。
+    - [x]  成功实现了 Namespaces, Pods, Deployments, Services 的列表展示。
+- [ ]  **核心资源浏览 (只读) - 详情页**:
+    - [ ]  目标: 为所有核心资源创建详情页，作为后续 AI 功能（如诊断）的载体。
+    - [ ]  页面模板: 将以 Pod 详情页为模板，建立一个包含基础信息卡片、可复用的事件表格 (EventsTable) 和可复用的只读 YAML 查看器 (ReadOnlyYamlViewer) 的标准布局。
+    - [ ]  实现范围:
+        - [ ]  Pods 详情页
+        - [ ]  Deployments 详情页
+        - [ ]  Services 详情页
+        - [ ]  Namespaces 详情页
 - [ ]  **AI 洞察 MVP (AI Insight MVP)**:
     - [ ]  在 Pod 详情页，添加一个“**AI 诊断**”按钮。
     - [ ]  后端 API (`/api/ai/diagnose/pod`) 接收 Pod 名称，获取其 `describe` 信息、`events` 和最新的200 行`logs`。

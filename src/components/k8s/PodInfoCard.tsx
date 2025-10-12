@@ -1,19 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { V1Pod } from '@kubernetes/client-node'
-
-interface InfoRowProps {
-  label: string
-  value: React.ReactNode
-}
-
-function InfoRow({ label, value }: InfoRowProps) {
-  return (
-    <div className="grid grid-cols-3 gap-4 border-b py-2 last:border-b-0">
-      <dt className="text-muted-foreground text-sm font-medium">{label}</dt>
-      <dd className="col-span-2 text-sm">{value || 'N/A'}</dd>
-    </div>
-  )
-}
+import { InfoRow } from '@/components/shared/InfoRow'
 
 interface PodInfoCardProps {
   pod: V1Pod | undefined

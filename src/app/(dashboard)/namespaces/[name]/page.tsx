@@ -1,50 +1,49 @@
 'use client'
 
 import { useK8sResource } from '@/hooks/useK8sResource'
-import { V1Pod, CoreV1Event } from '@kubernetes/client-node'
+import { V1Namespace, CoreV1Event } from '@kubernetes/client-node'
+import { NamespaceInfoCard } from '@/components/k8s/NamespaceInfoCard'
 import { Skeleton } from '@/components/ui/skeleton'
-import { PodInfoCard } from '@/components/k8s/PodInfoCard'
 import { EventsTable } from '@/components/k8s/EventsTable'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ReadOnlyYamlViewer } from '@/components/shared/ReadOnlyYamlViewer'
-import { PodContainersCard } from '@/components/k8s/PodContainersCard'
-import { Alert, AlertDescription } from '@/components/ui/alert'
 import { use } from 'react'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 
-// ... (接口和类型定义保持不变)
-interface PodDetailData {
-  detail: V1Pod
+interface NamespaceDetailData {
+  detail: V1Namespace
   events: CoreV1Event[]
   yaml: string
 }
-type Params = Promise<{ namespace: string; name: string }>
+type Params = Promise<{ name: string }>
 
-export default function PodDetailPage({ params }: { params: Params }) {
-  const { namespace, name } = use(params)
-  const { data, isLoading, isError } = useK8sResource<PodDetailData>(
-    `pods/${namespace}/${name}`,
+export default function NamespaceDetailPage({ params }: { params: Params }) {
+  const { name } = use(params)
+  const { data, isLoading, isError } = useK8sResource<NamespaceDetailData>(
+    `namespaces/${name}`,
   )
 
   if (isLoading) {
-    return <PodDetailSkeleton /> // 骨架屏保持不变
+    return <DetailSkeleton /> // 使用一个通用的骨架屏
   }
 
   if (isError) {
     return (
       <Alert variant="destructive">
         <AlertDescription>
-          {isError?.message || 'Failed to load pod details.'}
+          {isError?.message || 'Failed to load namespace details.'}
         </AlertDescription>
       </Alert>
     )
   }
-
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold">Pod: {name}</h1>
-        <p className="text-muted-foreground">Namespace: {namespace}</p>
+        <h1 className="text-2xl font-bold">Namespace: {name}</h1>
+        <p className="text-muted-foreground">
+          Status: {data?.detail.status?.phase}
+        </p>
       </div>
 
       <Tabs defaultValue="overview">
@@ -55,8 +54,8 @@ export default function PodDetailPage({ params }: { params: Params }) {
         </TabsList>
 
         <TabsContent value="overview" className="mt-4 space-y-6">
-          <PodInfoCard pod={data?.detail} />
-          <PodContainersCard pod={data?.detail} />
+          <NamespaceInfoCard namespace={data?.detail} />
+          {/* TODO: Add a card for Endpoints related to this namespace */}
         </TabsContent>
 
         <TabsContent value="events" className="mt-4">
@@ -78,7 +77,8 @@ export default function PodDetailPage({ params }: { params: Params }) {
   )
 }
 
-function PodDetailSkeleton() {
+// 通用骨架屏
+function DetailSkeleton() {
   return (
     <div className="space-y-6">
       <div>
@@ -91,8 +91,6 @@ function PodDetailSkeleton() {
         </CardHeader>
         <CardContent className="space-y-4">
           <Skeleton className="h-4 w-full" />
-          <Skeleton className="h-4 w-full" />
-          <Skeleton className="h-4 w-5/6" />
           <Skeleton className="h-4 w-full" />
         </CardContent>
       </Card>

@@ -1,40 +1,39 @@
 'use client'
 
 import { useK8sResource } from '@/hooks/useK8sResource'
-import { V1Pod, CoreV1Event } from '@kubernetes/client-node'
+import { V1Deployment, CoreV1Event } from '@kubernetes/client-node'
 import { Skeleton } from '@/components/ui/skeleton'
-import { PodInfoCard } from '@/components/k8s/PodInfoCard'
 import { EventsTable } from '@/components/k8s/EventsTable'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ReadOnlyYamlViewer } from '@/components/shared/ReadOnlyYamlViewer'
-import { PodContainersCard } from '@/components/k8s/PodContainersCard'
+import { DeploymentInfoCard } from '@/components/k8s/DeploymentInfoCard'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { use } from 'react'
 
-// ... (接口和类型定义保持不变)
-interface PodDetailData {
-  detail: V1Pod
+// --- 类型定义 ---
+interface DeploymentDetailData {
+  detail: V1Deployment
   events: CoreV1Event[]
   yaml: string
 }
 type Params = Promise<{ namespace: string; name: string }>
 
-export default function PodDetailPage({ params }: { params: Params }) {
+export default function DeploymentDetailPage({ params }: { params: Params }) {
   const { namespace, name } = use(params)
-  const { data, isLoading, isError } = useK8sResource<PodDetailData>(
-    `pods/${namespace}/${name}`,
+  const { data, isLoading, isError } = useK8sResource<DeploymentDetailData>(
+    `deployments/${namespace}/${name}`,
   )
 
   if (isLoading) {
-    return <PodDetailSkeleton /> // 骨架屏保持不变
+    return <DetailSkeleton /> // 使用一个通用的骨架屏
   }
 
   if (isError) {
     return (
       <Alert variant="destructive">
         <AlertDescription>
-          {isError?.message || 'Failed to load pod details.'}
+          {isError?.message || 'Failed to load11 deployment details.'}
         </AlertDescription>
       </Alert>
     )
@@ -43,7 +42,7 @@ export default function PodDetailPage({ params }: { params: Params }) {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold">Pod: {name}</h1>
+        <h1 className="text-2xl font-bold">Deployment: {name}</h1>
         <p className="text-muted-foreground">Namespace: {namespace}</p>
       </div>
 
@@ -55,8 +54,8 @@ export default function PodDetailPage({ params }: { params: Params }) {
         </TabsList>
 
         <TabsContent value="overview" className="mt-4 space-y-6">
-          <PodInfoCard pod={data?.detail} />
-          <PodContainersCard pod={data?.detail} />
+          <DeploymentInfoCard deployment={data?.detail} />
+          {/* TODO: Add a card for ReplicaSet/Pod status related to this deployment */}
         </TabsContent>
 
         <TabsContent value="events" className="mt-4">
@@ -78,7 +77,8 @@ export default function PodDetailPage({ params }: { params: Params }) {
   )
 }
 
-function PodDetailSkeleton() {
+// 通用骨架屏
+function DetailSkeleton() {
   return (
     <div className="space-y-6">
       <div>
@@ -91,8 +91,6 @@ function PodDetailSkeleton() {
         </CardHeader>
         <CardContent className="space-y-4">
           <Skeleton className="h-4 w-full" />
-          <Skeleton className="h-4 w-full" />
-          <Skeleton className="h-4 w-5/6" />
           <Skeleton className="h-4 w-full" />
         </CardContent>
       </Card>

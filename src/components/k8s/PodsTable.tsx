@@ -11,6 +11,7 @@ import {
 import { useK8sResource } from '@/hooks/useK8sResource'
 import { Skeleton } from '@/components/ui/skeleton'
 import Link from 'next/link'
+import { Alert, AlertDescription } from '../ui/alert'
 
 interface Pod {
   name: string
@@ -24,7 +25,13 @@ export function PodsTable() {
   const { data: pods, isLoading, isError } = useK8sResource<Pod[]>('pods')
 
   if (isError) {
-    return <div className="text-red-500">Failed to load pods.</div>
+    return (
+      <Alert variant="destructive">
+        <AlertDescription>
+          {isError?.message || 'Failed to load pods.'}
+        </AlertDescription>
+      </Alert>
+    )
   }
 
   return (

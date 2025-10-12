@@ -132,7 +132,122 @@ kubecopilot/
 └── tsconfig.json           # TypeScript 配置文件```
 ```
 
-## **5.2 已实现的核心组件与模式**
+## **5.2 当前的项目结构 (Current Project Structure)**
+
+```
+/home/dev/projects/kubecopilot/
+├───.eslintignore
+├───.gitignore
+├───.prettierrc.json
+├───components.json
+├───eslint.config.mjs
+├───next.config.ts
+├───package-lock.json
+├───package.json
+├───pnpm-lock.yaml
+├───postcss.config.mjs
+├───README.md
+├───SSOT.md
+├───tsconfig.json
+├───prisma/
+│   └───schema.prisma
+├───public/
+│   ├───file.svg
+│   ├───globe.svg
+│   ├───next.svg
+│   ├───vercel.svg
+│   └───window.svg
+└───src/
+    ├───middleware.ts
+    ├───app/
+    │   ├───favicon.ico
+    │   ├───globals.css
+    │   ├───layout.tsx
+    │   ├───(dashboard)/
+    │   │   ├───layout.tsx
+    │   │   ├───page.tsx
+    │   │   ├───deployments/
+    │   │   │   ├───page.tsx
+    │   │   │   └───[namespace]/
+    │   │   │       └───[name]/
+    │   │   │           └───page.tsx
+    │   │   ├───namespaces/
+    │   │   │   ├───page.tsx
+    │   │   │   └───[name]/
+    │   │   │       └───page.tsx
+    │   │   ├───pods/
+    │   │   │   ├───page.tsx
+    │   │   │   └───[namespace]/
+    │   │   │       └───[name]/
+    │   │   │           └───page.tsx
+    │   │   └───services/
+    │   │       ├───page.tsx
+    │   │       └───[namespace]/
+    │   │           └───[name]/
+    │   │               └───page.tsx
+    │   ├───api/
+    │   │   └───k8s/
+    │   │       ├───connect/
+    │   │       │   └───route.ts
+    │   │       ├───deployments/
+    │   │       │   ├───route.ts
+    │   │       │   └───[namespace]/
+    │   │       │       └───[name]/
+    │   │       │           └───route.ts
+    │   │       ├───namespaces/
+    │   │       │   ├───route.ts
+    │   │       │   └───[name]/
+    │   │       │       └───route.ts
+    │   │       ├───pods/
+    │   │       │   ├───route.ts
+    │   │       │   └───[namespace]/
+    │   │       │       └───[name]/
+    │   │       │           └───route.ts
+    │   │       └───services/
+    │   │           ├───route.ts
+    │   │           └───[namespace]/
+    │   │               └───[name]/
+    │   │                   └───route.ts
+    │   └───connect/
+    │       └───page.tsx
+    ├───components/
+    │   ├───k8s/
+    │   │   ├───DeploymentInfoCard.tsx
+    │   │   ├───DeploymentsTable.tsx
+    │   │   ├───EventsTable.tsx
+    │   │   ├───NamespaceInfoCard.tsx
+    │   │   ├───NamespaceTable.tsx
+    │   │   ├───PodContainersCard.tsx
+    │   │   ├───PodInfoCard.tsx
+    │   │   ├───PodsTable.tsx
+    │   │   ├───ServiceInfoCard.tsx
+    │   │   └───ServicesTable.tsx
+    │   ├───layout/
+    │   │   ├───Header.tsx
+    │   │   └───Sidebar.tsx
+    │   ├───shared/
+    │   │   └───ReadOnlyYamlViewer.tsx
+    │   └───ui/
+    │       ├───alert.tsx
+    │       ├───badge.tsx
+    │       ├───button.tsx
+    │       ├───card.tsx
+    │       ├───dropdown-menu.tsx
+    │       ├───label.tsx
+    │       ├───skeleton.tsx
+    │       ├───table.tsx
+    │       ├───tabs.tsx
+    │       └───textarea.tsx
+    ├───hooks/
+    │   └───useK8sResource.ts
+    └───lib/
+        ├───session.ts
+        ├───utils.ts
+        └───k8s/
+            └───client.ts
+```
+
+## **5.3 已实现的核心组件与模式**
 
 本节记录项目在代码层面已实现的关键抽象和可复用单元，以反映当前工程进度。
 后端:   
@@ -434,14 +549,14 @@ graph TD
 - [x]  **核心资源浏览 (只读) - 列表页**:
     - [x]  搭建了可复用的数据获取模式 (useK8sResource Hook) 和 UI 组件 (Table, Skeleton)。
     - [x]  成功实现了 Namespaces, Pods, Deployments, Services 的列表展示。
-- [ ]  **核心资源浏览 (只读) - 详情页**:
-    - [ ]  目标: 为所有核心资源创建详情页，作为后续 AI 功能（如诊断）的载体。
-    - [ ]  页面模板: 将以 Pod 详情页为模板，建立一个包含基础信息卡片、可复用的事件表格 (EventsTable) 和可复用的只读 YAML 查看器 (ReadOnlyYamlViewer) 的标准布局。
-    - [ ]  实现范围:
-        - [ ]  Pods 详情页
-        - [ ]  Deployments 详情页
-        - [ ]  Services 详情页
-        - [ ]  Namespaces 详情页
+- [x]  **核心资源浏览 (只读) - 详情页**:
+    - [x]  目标: 为所有核心资源创建详情页，作为后续 AI 功能（如诊断）的载体。
+    - [x]  页面模板: 将以 Pod 详情页为模板，建立一个包含基础信息卡片、可复用的事件表格 (EventsTable) 和可复用的只读 YAML 查看器 (ReadOnlyYamlViewer) 的标准布局。
+    - [x]  实现范围:
+        - [x]  Pods 详情页
+        - [x]  Deployments 详情页
+        - [x]  Services 详情页
+        - [x]  Namespaces 详情页
 - [ ]  **AI 洞察 MVP (AI Insight MVP)**:
     - [ ]  在 Pod 详情页，添加一个“**AI 诊断**”按钮。
     - [ ]  后端 API (`/api/ai/diagnose/pod`) 接收 Pod 名称，获取其 `describe` 信息、`events` 和最新的200 行`logs`。

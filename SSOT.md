@@ -458,52 +458,117 @@ graph TD
     - **KubeCopilot 实践**:
         - 在每个数据获取 API (如 `/api/k8s/namespaces`) 的最后一步，必须有一个明确的 `map` 或转换操作，从完整的 K8s 资源对象中，只挑选出 UI 需要的字段（如 `name`, `status`, `creationTimestamp`）来构建响应体。
 
+### 8.2 核心架构：会话管理演进路线图 (Session Management Evolution Roadmap)
+- **原则**: 践行“MVP 优先”和“开发者体验至上”的原则，同时确保架构能平滑演进以满足未来的安全需求，我们为会话管理制定了以下三阶段演进路线。此路线避免了在代码中引入区分开发/生产环境的复杂逻辑。
+    - **Phase 1 : MVP - 无状态加密 Cookie 方案 (Stateless Encrypted Cookie)**
+        - **目标**: 快速实现一个零本地依赖、无状态且对 Serverless 友好的会话机制。
+        - **实现**:
+            - 用户在 /connect 页面提交 Kubeconfig。
+            - 后端验证 Kubeconfig 后，使用一个仅存于服务端的密钥 (KUBECONFIG_SECRET_KEY) 对其进行 AES-256-GCM 加密。
+            - 将加密后的 Kubeconfig 字符串存储在一个 HttpOnly、Secure、SameSite=Strict 的 Cookie 中返回给浏览器。
+            - 后续每个请求，后端从 Cookie 中读取并解密 Kubeconfig，在请求的生命周期内实例化 K8s 客户端。
+        - **优点**:
+            - 极致的开发者体验: 本地开发无需安装和配置 Redis 等任何额外服务。
+            - Serverless 就绪: 天然无状态，完美契合 Vercel 部署模型。
+        - **已知局限**:
+            - **Cookie 尺寸限制**: Kubeconfig 较大时可能超出浏览器 4KB 的限制。
+            - **无法集中撤销**: 无法从服务端强制让某个用户的会话失效。
+            - **升级触发器**: 当我们需要支持内嵌证书的大型 Kubeconfig，或需要实现“强制登出”等安全管理功能时，启动 Phase 2。
+    - **Phase 2: 健壮性增强 - 引入后端 KV 存储 (Robustness Enhancement)**
+        - **目标**: 解决 Phase 1 的局限性，提升系统的健壮性和可管理性。
+        - **实现**:
+            - 引入一个 Serverless 键值数据库（如 Vercel KV 或 Upstash）。
+            - 连接流程变更为：后端验证 Kubeconfig 后，生成一个安全的随机 Session ID，将 Session ID -> Kubeconfig 的映射关系存入 KV 存储，并设置过期时间 (TTL)。
+            - 仅将这个短小的 Session ID 存入浏览器的 HttpOnly Cookie 中。
+            - 后续每个请求，后端从 Cookie 中读取 Session ID，使用它从 KV 存储中检索 Kubeconfig。
+        - **优点**:
+            - 解决了 Cookie 尺寸问题。
+            - 实现了会话的集中管理和撤销能力。
+            - 最小化了敏感信息（凭证）的暴露面。
+        - **已知局限**:
+            - **性能开销**: 每个请求都需要与 KV 存储交互，增加了延迟。
+            - **单点故障**: 如果 KV 存储服务失败，整个系统将瘫痪。
+        - **升级触发器**: 当我们需要支持更复杂的安全场景（如角色基础访问控制）或需要实现“强制登出”等功能时，启动 Phase 3。
+    - **Phase 3: 企业级安全 - 短期令牌交换 (Enterprise-Grade Security)**
+        - **目标**: 实现 Kubernetes 安全的最佳实践，满足最严格的安全与合规要求。
+        - **实现**:
+            - 将连接流程升级为凭证交换模式。
+            - 用户提交 Kubeconfig 后，后端立即使用它向目标集群的 TokenRequest API 请求一个短期（例如 15-60 分钟）的访问令牌 (Token)。
+            - 原始 Kubeconfig 被立即丢弃，不再存储。后端在 KV 存储中保存的是这个短期令牌和（如果可用）刷新令牌 (Refresh Token)。
+            - 后续所有对 K8s API 的请求都使用这个短期令牌进行认证。
+            - 当短期令牌过期时，后端可以使用刷新令牌获取新的短期令牌，而无需用户重新登录。
+        - **优点**:
+            - **最小权限与时间原则**: 凭证的生命周期被严格限制，极大降低了泄露风险。
+            - 符合行业最高安全标准。
+            - **适用场景**: 作为高级或企业版功能，提供给对安全性有极高要求的用户。
+
 # 9. 核心数据结构:OperationPlan
 
 这是连接 AI 与 Kubernetes 的核心契约，**是本项目最重要的抽象**。所有写操作都必须先被封装成一个OperationPlan。
 
 **Schema (Zod 定义):**
 
-```tsx
-{
-  id: string, // uuid
-  status: 'pending' | 'confirmed' | 'executed' | 'failed' | 'reverted',
-  action: 'create' | 'update' | 'delete' | 'scale' | 'restart',
-  resource: {
-    kind: string,
-    namespace: string,
-    name: string,
-  },
-  diff: { // 对比变更内容
-    before: object | null,
-    after: object | null,
-  },
-  risk: {
-    level: 'low' | 'medium' | 'high',
-    rationale: string, // AI/规则给出的风险评估理由
-  },
-  aiRationale: string, // AI 解释为什么要做这个操作
-  audit: {
-    requestedBy: string, // 'user:alice' or 'ai:anomaly-detector'
-    confirmedBy: string | null,
-    executedBy: string,
-    timestamps: {
-		  createdAt: Date,
-		  confirmedAt: Date | null,
-		  executedAt: Date | null,
-		  failedAt: Date | null,
-		  revertedAt: Date | null
-		},
-  }
-}
+```typescript
+import { z } from 'zod';
 
+// RFC 6902 JSON Patch object schema
+const jsonPatchSchema = z.array(
+  z.object({
+    op: z.enum(['add', 'remove', 'replace']),
+    path: z.string(),
+    value: z.any().optional(),
+  })
+);
+
+export const OperationPlanSchema = z.object({
+  id: z.string().uuid(),
+  status: z.enum(['pending', 'confirmed', 'executed', 'failed', 'reverted']),
+  action: z.enum(['create', 'update', 'delete', 'scale', 'restart']),
+  resource: z.object({
+    kind: z.string(),
+    namespace: z.string(),
+    name: z.string(),
+  }),
+  diff: z.object({
+    // 用于执行前终态检查和 UI 深度对比的完整资源快照
+    before: z.record(z.string(), z.any()).nullable(),
+    // 用于高效存储和清晰展示变更核心的 JSON Patch
+    patch: jsonPatchSchema,
+  }),
+  risk: z.object({
+    level: z.enum(['low', 'medium', 'high']),
+    rationale: z.string(), // AI/规则给出的风险评估理由
+  }),
+  aiRationale: z.string(), // AI 解释为什么要做这个操作
+  audit: z.object({
+    requestedBy: z.string(), // 'user:alice' or 'ai:anomaly-detector'
+    confirmedBy: z.string().nullable(),
+    executedBy: z.string(),
+    timestamps: z.object({
+      createdAt: z.date(),
+      confirmedAt: z.date().nullable(),
+      executedAt: z.date().nullable(),
+      failedAt: z.date().nullable(),
+      revertedAt: z.date().nullable(),
+    }),
+  }),
+});
 ```
+- **核心挑战 1**: 从机器语言到人类直觉 (Core Challenge: From Machine Language to Human Intuition)
+    - **问题**: OperationPlan 内部采用 JSON Patch 格式来高效存储变更，但这对于人类用户是难以直接阅读的。为了在 PlanConfirmModal 中提供直观、无歧义的变更审查体验，我们必须将机器友好的数据结构翻译成人类友好的可视化界面。
+    - **解决方案**: 分层可视化策略 (Layered Visualization Strategy)
+- **核心挑战 2**: 变更审查的透明度和可解释性 (Core Challenge: Transparency and Interpretability of Change Reviews)
+    - **问题**: 虽然 OperationPlan 提供了详细的变更记录，但直接展示 JSON Patch 对非技术用户来说是非常抽象和不直观的。
+    - **解决方案**: 我们将采用一个三层递进的信息展示模型，以满足不同用户的审查深度需求：
+        - **第一层**：人类可读的摘要 (Human-Readable Summary): 在模态框顶部用自然语言清晰总结核心操作 (例如: "将 Deployment 'my-app' 的副本数变更为 5")。这是所有用户第一眼看到的信息。
+        - **第二层**：结构化变更列表 (Structured Change List): 一个简洁的表格，逐项列出所有变更的路径 (path) 和新值 (value)，供技术用户快速浏览细节。
+        - **第三层**：完整的并排差异视图 (Full Side-by-Side Diff View): 默认折叠的、类似 GitHub PR 的高亮 YAML 差异对比。它通过在前端将 diff.patch 应用于 diff.before 对象来动态生成“之后”的状态，为高风险操作提供最高级别的审查能力。
 
-- **补充说明 1**: 
+- **补充说明 1**: OperationPlan 生成与 diff.before 填充时机
     - diff.before 字段必须在**生成 OperationPlan 的那一刻**，通过向 K8s API Server 查询资源的**当前状态**来填充。diff.after 则是根据用户意图和当前状态计算出的**期望状态**。
     - 时间戳字段为“审计”和“事后复盘”提供了精确到毫秒的关键证据链。我们可以清晰地知道一个计划从被创建、被确认到被执行分别花费了多长时间。
     - **理由**: 这强调了一个关键的实现细节。如果不在生成计划时就固定 before 状态，那么从计划生成到用户确认的这段时间内，资源的真实状态可能又发生了变化，这会导致执行结果与预期不符。固定 diff 快照是保证操作确定性的重要一环。
-- **补充说明 2**: 
+- **补充说明 2**: OperationPlan 执行前终态检查
     - **Pre-Execution Check (执行前终态检查)**: 在执行 /api/ai/execute 时，系统必须在执行操作前，重新从 K8s API 获取资源的当前状态，并与 OperationPlan.diff.before 快照进行对比。若不一致，必须中止操作并向用户报告。
     - **Action Whitelist (操作白名单)**: AI 编排器在生成 OperationPlan 后，必须根据一个硬编码的 (action, resource.kind) 白名单进行校验。例如，初期白名单可能只包含 ('restart', 'Deployment'), ('scale', 'Deployment')。任何不在白名单内的计划都将被拒绝。
     - **理由**: 这两条原则是“安全默认”设计哲学的具体代码实现，能从根本上杜绝状态漂移和 AI “越权”操作带来的风险，是我们构建可信赖写操作的基石。
@@ -631,7 +696,26 @@ graph TD
 - [**未来**] **Admission Webhook (PoC)**: 探索将 `riskEngine` 的规则能力前置到 K8s 的准入控制层。
 - [**未来**] **插件系统**: 允许集成更多数据源（如 CloudWatch, GitOps 工具）和自定义操作。
 - [**未来**] **多集群管理与商业化**: 提供 Helm Chart/Docker 镜像部署，并探索多集群管理和商业支持模式。
-
+    [未来] 多集群管理与上下文切换 (Multi-Cluster Management & Context Switching)
+    愿景: 将 KubeCopilot 从单集群诊断工具提升为 SRE 和平台工程师的中央控制台，使其能够无缝管理和切换多个 Kubernetes 环境（如开发、预发布、生产）。
+    核心特性:
+        安全凭证存储: 允许用户连接并安全地存储多个集群的凭证。Kubeconfig 将被加密后存储在数据库中，并与用户账户关联。
+        连接命名: 用户可以为每个连接指定一个易于识别的名称（例如，prod-us-east-1, staging-eu-west, dev-cluster）。
+        快速上下文切换: 在 UI 顶部 Header 中实现一个全局的集群切换下拉菜单，允许用户一键切换当前操作的集群上下文，无需重新登录或粘贴 Kubeconfig。
+    [远期] 跨集群概览: 在主仪表盘页面提供一个“舰队概览”视图，集中展示所有已连接集群的关键健康状态指标。
+        战略价值: 这是 KubeCopilot 实现商业化和被大型团队采纳的关键一步。它极大地扩展了产品的目标用户范围，从个人开发者延伸到管理复杂基础设施的整个团队，是实现“智能驾驶舱”宏大愿景的必要基础。
+- [企业级特性] **敏感数据脱敏网关 (Sensitive Data Sanitization Gateway)**
+    愿景: 为确保 KubeCopilot 在处理包含严格数据隐私和合规性要求的生产环境中是安全的，我们将引入一个 AI 上下文的脱敏层。
+    实现:
+        在 AI 编排器 (/lib/ai/) 中创建一个 Sanitizer 模块。
+        在任何包含自由文本（尤其是 Pod 日志）的上下文被发送给第三方 LLM Provider 之前，都会强制通过此模块进行处理。
+        该模块将采用可配置的、基于正则表达式的规则集，自动识别并屏蔽或替换敏感信息，例如：
+        IP 地址 (v4/v6) -> [REDACTED_IP]
+        电子邮件地址 -> [REDACTED_EMAIL]
+        UUIDs / Hashes -> [REDACTED_ID]
+        常见的 API Key 或 Token 格式 -> [REDACTED_SECRET]
+    用户透明度: UI 将明确告知用户，用于 AI 分析的数据会经过脱敏处理。
+    战略价值: 此功能是 KubeCopilot 从一个开发者工具演变为一个可被企业信赖的 SRE 平台的核心安全保障，是构建“安全默认”设计哲学的关键实践。
 ---
 
 <aside>

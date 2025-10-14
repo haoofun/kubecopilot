@@ -14,7 +14,8 @@ KubeCopilot
 - **安全默认 (Secure by Default)**: 所有写操作都必须经过 `OperationPlan` 的结构化审查。Kubeconfig 等敏感凭证的处理沿用最高安全标准，后端是唯一与 K8s API 通信的组件。
 - **结构化与可审计 (Structured & Auditable)**: AI 的任何输出，特别是写操作建议，都必须是结构化的、可被机器校验的 (Schema-First)。所有变更必须留下清晰、不可篡改的审计日志。
 - **开发者体验至上 (DX First)**: 无论是最终用户的使用体验，还是我们自身的开发流程，都追求简洁、流畅和高效。
-- 参考**《SRE Google运维解密》**
+- **参考 《SRE Google运维解密》**
+- **Prompt 可重用与可演化 (Prompt as Infra)**: 所有 Prompt 均作为可版本化的资源存在，支持迭代、评估与灰度发布。Prompt 不仅是指令，更是产品行为的一部分。
 
 # 3. 角色与职责 (Roles & Responsibilities)
 
@@ -45,6 +46,8 @@ KubeCopilot
     3.  **审查 (CLI)**: (可选) 当需要对特定实现进行反馈时，使用 CLI 让 AI 对本地代码进行审查。
     4.  **同步 (Web Chat)**: 完成任务后，在战略指挥室同步进度，并规划下一步行动。
 
+通过这种分层协作，KubeCopilot 项目能在保持「人类战略控制」的同时，充分利用不同层级 AI 的能力，形成一个自组织的智能开发系统。
+
 # 4. 技术栈 (Tech Stack)
 
 - **核心框架**: Next.js 14 (App Router), TypeScript
@@ -63,6 +66,7 @@ KubeCopilot
 - **AI 与数据校验**:
     - **LLM 客户端**: openai 或 @google/generative-ai
         - *理由*: 用于与大语言模型 API（如 OpenAI GPT 系列或 Google Gemini 系列）进行交互。
+        - **AI 客户端抽象层**: 我们将 AI 客户端实现为一个可插拔的模块，通过配置文件指定使用的模型（如 OpenAI、Google Gemini、Ollama 等）。这使得我们可以在不改变核心业务逻辑的情况下，轻松切换不同的 AI 模型。
     - **Schema 校验**: Zod
         - *理由*: **AI Native 架构的基石**。用于在后端严格校验 LLM 返回的 JSON 是否符合我们定义的 OperationPlan 等 Schema，确保 AI 输出的可靠性和安全性。
 - **编辑器与可视化**:
@@ -78,7 +82,9 @@ KubeCopilot
 - **日志库**:
     - pino 或 winston。
     - **理由**: 一个好的后端服务必须有结构化的日志。pino 以其极高的性能和 JSON 结构化日志输出而著称，非常适合在 API 路由中记录请求、AI 操作、错误等信息，便于未来的日志分析和告警。
-
+- **部署与运行环境**:
+    - Docker + Kubernetes (自部署)
+    - [未来] Helm Chart 用于打包与发布
 ---
 
 # 5. 项目结构 (Project Structure)
@@ -155,7 +161,6 @@ kubecopilot/
 │   ├───file.svg
 │   ├───globe.svg
 │   ├───next.svg
-│   ├───vercel.svg
 │   └───window.svg
 └───src/
     ├───middleware.ts
@@ -300,7 +305,7 @@ kubecopilot/
         git commit -m "Add *** feat"
         git push -u origin feat/XXX(git push --set-upstream origin feat/XXX)
     3. 开发完成后，向 `main` 分支发起 Pull Request (PR)。
-    4. PR 合并后，自动触发 Vercel 部署到生产环境。
+    4. PR 合并。
         git checkout main
         git pull origin main
     5. 删除已合并的功能分支。
@@ -458,49 +463,6 @@ graph TD
     - **KubeCopilot 实践**:
         - 在每个数据获取 API (如 `/api/k8s/namespaces`) 的最后一步，必须有一个明确的 `map` 或转换操作，从完整的 K8s 资源对象中，只挑选出 UI 需要的字段（如 `name`, `status`, `creationTimestamp`）来构建响应体。
 
-### 8.2 核心架构：会话管理演进路线图 (Session Management Evolution Roadmap)
-- **原则**: 践行“MVP 优先”和“开发者体验至上”的原则，同时确保架构能平滑演进以满足未来的安全需求，我们为会话管理制定了以下三阶段演进路线。此路线避免了在代码中引入区分开发/生产环境的复杂逻辑。
-    - **Phase 1 : MVP - 无状态加密 Cookie 方案 (Stateless Encrypted Cookie)**
-        - **目标**: 快速实现一个零本地依赖、无状态且对 Serverless 友好的会话机制。
-        - **实现**:
-            - 用户在 /connect 页面提交 Kubeconfig。
-            - 后端验证 Kubeconfig 后，使用一个仅存于服务端的密钥 (KUBECONFIG_SECRET_KEY) 对其进行 AES-256-GCM 加密。
-            - 将加密后的 Kubeconfig 字符串存储在一个 HttpOnly、Secure、SameSite=Strict 的 Cookie 中返回给浏览器。
-            - 后续每个请求，后端从 Cookie 中读取并解密 Kubeconfig，在请求的生命周期内实例化 K8s 客户端。
-        - **优点**:
-            - 极致的开发者体验: 本地开发无需安装和配置 Redis 等任何额外服务。
-            - Serverless 就绪: 天然无状态，完美契合 Vercel 部署模型。
-        - **已知局限**:
-            - **Cookie 尺寸限制**: Kubeconfig 较大时可能超出浏览器 4KB 的限制。
-            - **无法集中撤销**: 无法从服务端强制让某个用户的会话失效。
-            - **升级触发器**: 当我们需要支持内嵌证书的大型 Kubeconfig，或需要实现“强制登出”等安全管理功能时，启动 Phase 2。
-    - **Phase 2: 健壮性增强 - 引入后端 KV 存储 (Robustness Enhancement)**
-        - **目标**: 解决 Phase 1 的局限性，提升系统的健壮性和可管理性。
-        - **实现**:
-            - 引入一个 Serverless 键值数据库（如 Vercel KV 或 Upstash）。
-            - 连接流程变更为：后端验证 Kubeconfig 后，生成一个安全的随机 Session ID，将 Session ID -> Kubeconfig 的映射关系存入 KV 存储，并设置过期时间 (TTL)。
-            - 仅将这个短小的 Session ID 存入浏览器的 HttpOnly Cookie 中。
-            - 后续每个请求，后端从 Cookie 中读取 Session ID，使用它从 KV 存储中检索 Kubeconfig。
-        - **优点**:
-            - 解决了 Cookie 尺寸问题。
-            - 实现了会话的集中管理和撤销能力。
-            - 最小化了敏感信息（凭证）的暴露面。
-        - **已知局限**:
-            - **性能开销**: 每个请求都需要与 KV 存储交互，增加了延迟。
-            - **单点故障**: 如果 KV 存储服务失败，整个系统将瘫痪。
-        - **升级触发器**: 当我们需要支持更复杂的安全场景（如角色基础访问控制）或需要实现“强制登出”等功能时，启动 Phase 3。
-    - **Phase 3: 企业级安全 - 短期令牌交换 (Enterprise-Grade Security)**
-        - **目标**: 实现 Kubernetes 安全的最佳实践，满足最严格的安全与合规要求。
-        - **实现**:
-            - 将连接流程升级为凭证交换模式。
-            - 用户提交 Kubeconfig 后，后端立即使用它向目标集群的 TokenRequest API 请求一个短期（例如 15-60 分钟）的访问令牌 (Token)。
-            - 原始 Kubeconfig 被立即丢弃，不再存储。后端在 KV 存储中保存的是这个短期令牌和（如果可用）刷新令牌 (Refresh Token)。
-            - 后续所有对 K8s API 的请求都使用这个短期令牌进行认证。
-            - 当短期令牌过期时，后端可以使用刷新令牌获取新的短期令牌，而无需用户重新登录。
-        - **优点**:
-            - **最小权限与时间原则**: 凭证的生命周期被严格限制，极大降低了泄露风险。
-            - 符合行业最高安全标准。
-            - **适用场景**: 作为高级或企业版功能，提供给对安全性有极高要求的用户。
 
 # 9. 核心数据结构:OperationPlan
 
@@ -573,6 +535,31 @@ export const OperationPlanSchema = z.object({
     - **Action Whitelist (操作白名单)**: AI 编排器在生成 OperationPlan 后，必须根据一个硬编码的 (action, resource.kind) 白名单进行校验。例如，初期白名单可能只包含 ('restart', 'Deployment'), ('scale', 'Deployment')。任何不在白名单内的计划都将被拒绝。
     - **理由**: 这两条原则是“安全默认”设计哲学的具体代码实现，能从根本上杜绝状态漂移和 AI “越权”操作带来的风险，是我们构建可信赖写操作的基石。
 
+- **OperationPlan 差异可视化**：从机器语言到人类直觉 (Diff Visualization: From Machine Language to Human Intuition)
+    - **核心挑战**: OperationPlan 内部采用 JSON Patch 格式高效存储变更，但这对于人类用户是难以阅读的。为了在 PlanConfirmModal 中提供直观、无歧义的变更审查体验，我们必须将机器友好的数据结构翻译成人类友好的可视化界面。
+    - **解决方案**: 分层展示策略 (Layered Display Strategy)
+        我们将采用一个三层递进的信息展示模型，以满足不同用户的审查深度需求：
+        - **第一层**：人类可读的摘要 (Human-Readable Summary)
+        目标用户: 所有用户。
+        形式: 在模态框顶部用自然语言清晰总结核心操作。
+        实现: 后端或前端将 JSON Patch 数组映射为简洁的描述性文本。
+        示例:
+        JSON Patch: [{ "op": "replace", "path": "/spec/replicas", "value": 5 }]
+        UI 显示: "将 Deployment 'my-app' 的副本数 (replicas) 变更为 5"
+        - **第二层**：结构化变更列表 (Structured Change List)
+        目标用户: 技术用户，需要快速浏览变更细节。
+        形式: 一个简洁的表格，逐项列出所有变更的路径和新值。
+        实现: 直接遍历 JSON Patch 数组并格式化输出。
+        UI 显示:
+        | 操作 | 目标路径 | 新值 |
+        | :--- | :--- | :--- |
+        | replace | /spec/replicas | 5 |
+        - **第三层**：完整的并排差异视图 (Full Side-by-Side Diff View)
+        目标用户: 高级用户或在进行高风险操作时，需要进行深度代码级审查。
+        形式: 类似 GitHub PR 的、高亮的、并排 YAML 差异对比。
+    实现: 此视图默认折叠。点击展开后，前端将使用 OperationPlan 中缓存的 before 状态，并动态应用 JSON Patch 来生成 after 状态，然后使用 react-diff-viewer 等库进行渲染。
+    战略价值: 此策略完美践行了“开发者体验至上”的原则。它通过信息分层，既为快速、低风险的操作提供了流畅的确认流程，也为复杂、高风险的变更提供了最高级别的安全审查能力，在效率和严谨之间取得了最佳平衡。
+
 # **10. 开发路线图 (Revised Roadmap)**
 
 这是最重要的部分。我们将宏大的愿景分解为更务实、更聚焦的四个阶段。
@@ -605,12 +592,12 @@ export const OperationPlanSchema = z.object({
         - [x]  服务端验证: 在后端，使用 @kubernetes/client-node 库来解析这个 Kubeconfig 字符串。尝试用解析出的凭证初始化一个 Kubernetes API 客户端实例。执行一个简单的、只读的 API 调用（例如 listNamespace 或 getComponentStatus）来验证凭证的有效性和与集群的连通性。
         - [x]  会话管理 (简化版):如果验证成功，将这个 Kubeconfig 内容安全地存储在服务端的会话中（初期我们可以使用一个简单的内存存储或加密的 Cookie）。严禁将 Kubeconfig 返回或存储在前端。如果验证失败，返回一个明确的错误信息。
     - [x]  任务 3: 实现连接后的跳转与认证保护:
-        - [x]  前端逻辑: 当用户点击“连接”并收到后端的成功响应后，使用 Next.js 的 useRouter 将页面重定向到 /dashboard。
-        - [x]  认证中间件 (Middleware): 创建一个 Next.js Middleware，用于保护 (dashboard) 路由组下的所有页面。这个中间件会检查用户的会话中是否存在有效的集群连接凭证。如果不存在，就将其重定向回 /connect 页面。
-    - [x]  任务 4: 搭建基础仪表盘布局 ((dashboard)/layout.tsx):
+        - [x]  前端逻辑: 当用户点击“连接”并收到后端的成功响应后，使用 Next.js 的 useRouter 将页面重定向到 /。
+        - [x]  认证中间件 (Middleware): 创建一个 Next.js Middleware，用于保护 (/) 路由组下的所有页面。这个中间件会检查用户的会话中是否存在有效的集群连接凭证。如果不存在，就将其重定向回 /connect 页面。
+    - [x]  任务 4: 搭建基础仪表盘布局 (/layout.tsx):
         - [x]  UI 框架: 创建一个包含侧边栏 (Sidebar) 和顶部栏 (Header) 的基础响应式布局。
         - [x]  侧边栏: 暂时放置一些静态链接，指向我们未来将要开发的页面（如 Namespaces, Pods, Deployments）。
-        - [x]  内容区域: 布局中应包含一个主内容区域，用于渲染各个页面（例如 /dashboard 的概览页）。
+        - [x]  内容区域: 布局中应包含一个主内容区域，用于渲染各个页面（例如 / 的概览页）。
 - [x]  **核心资源浏览 (只读) - 列表页**:
     - [x]  搭建了可复用的数据获取模式 (useK8sResource Hook) 和 UI 组件 (Table, Skeleton)。
     - [x]  成功实现了 Namespaces, Pods, Deployments, Services 的列表展示。
@@ -623,12 +610,32 @@ export const OperationPlanSchema = z.object({
         - [x]  Services 详情页
         - [x]  Namespaces 详情页
 - [ ]  **AI 洞察 MVP (AI Insight MVP)**:
-    - [ ]  在 Pod 详情页，添加一个“**AI 诊断**”按钮。
-    - [ ]  后端 API (`/api/ai/diagnose/pod`) 接收 Pod 名称，获取其 `describe` 信息、`events` 和最新的200 行`logs`。
-    - [ ]  将上述信息作为上下文，调用 LLM Provider，要求其返回一个结构化的 JSON，分析 Pod 的当前状态、潜在问题和建议。
-    - [ ]  前端将这个结构化的诊断结果美观地展示出来。
-- **阶段成果**: 一个功能完善的 K8s Dashboard，但它多了一个“会说话”的诊断功能。
-
+    - [ ]  任务 1: UI 实现: 在 Pod 详情页，添加一个“AI 诊断”按钮和一个用于展示结果的面板 (可以使用 Alert 或 Accordion 组件)。
+    - [ ]  任务 2: 后端 API (/api/ai/diagnose/pod):
+        - [ ]  创建 API 路由，接收 namespace 和 podName。
+        - [ ]  调用 K8s 客户端，并行获取该 Pod 的 describe (通过 readNamespacedPod)、events (通过 listNamespacedEvent 并按 involvedObject 过滤) 和 logs (通过 readNamespacedPodLog)。
+        - [ ]  (新) 数据预处理: 对获取的日志进行初步清洗，移除过长的、重复的行，为 LLM 准备一个干净的上下文。
+    - [ ]  任务 3: AI Prompt 与解析:
+        - [ ]  在 /prompts 目录下创建 diagnose-pod.md，设计一个包含上下文、角色扮演和结构化输出要求的 Prompt 模板。
+        - [ ]  调用 LLM Provider API，并使用 Zod Schema (ai-diagnosis.ts) 严格校验返回的 JSON。
+    - [ ]  任务 4: 前端渲染: 前端接收到结构化的 JSON 后，使用 Badge、列表等组件将其美观地展示出来（例如：Status: Unhealthy Reason: CrashLoopBackOff Suggestion: ...）。
+- [ ]  **核心资源广度覆盖 (Broaden Core Resource Coverage)**:
+    - [ ]  目标：快速提升 KubeCopilot 作为“只读 Dashboard”的实用性，让用户能看到最常用的 K8s 资源。
+    增加核心工作负载资源:
+    - [ ]  StatefulSets (列表/详情页)
+    - [ ]  DaemonSets (列表/详情页)
+    - [ ]  Jobs & CronJobs (列表/详情页)
+    增加配置与存储资源:
+    - [ ]  ConfigMaps (列表/详情页，详情页高亮显示 data)
+    - [ ]  Secrets (列表/详情页，详情页对 Secret value 进行模糊化/隐藏处理，提供“显示”按钮)
+    - [ ]  PersistentVolumeClaims (PVCs) & PersistentVolumes (PVs) (列表/详情页)
+    增加网络资源:
+    - [ ]  Ingresses (列表/详情页)
+    增加集群级资源:
+    - [ ]  Nodes (列表/详情页)
+    增加事件资源:
+    - [ ]  Events (提供一个全局的、可过滤的事件查看页面)
+- **阶段成果**: 一个功能完善的、覆盖了 SRE 日常 90% 常用资源的 K8s 只读 Dashboard，并拥有独特的 AI 诊断 Pod 的能力。
 ---
 
 ## **Phase 2: 结构化写操作与风险控制 (Structured Write & Risk Control)**
@@ -662,14 +669,35 @@ export const OperationPlanSchema = z.object({
     - [ ]  集成 Monaco Editor，将所有资源详情页的只读 YAML 升级为可编辑。
     - [ ]  在编辑器旁提供一个 AI 面板，可以对当前 YAML 进行“解释”、“检查最佳实践”、“生成修改建议”。
     - [ ]  实现“应用”按钮，该操作同样会生成一个 `OperationPlan` 进入审查流程。
-- [ ]  **扩展资源支持**:
-    - [ ]  增加对 `ConfigMaps`, `Secrets` (数据模糊化处理), `Ingresses` 的浏览和 AI 辅助编辑。
-- [ ]  **集成监控上下文**:
-    - [ ]  在后端添加 Prometheus 客户端。
-    - [ ]  当 AI 进行诊断或生成计划时，可以主动查询相关的 CPU/内存指标，使其建议更有数据支撑。
-    - [ ]  在 Node/Pod 详情页用图表展示基础监控信息。
-- **阶段成果**: KubeCopilot 不仅能执行命令，还能作为 YAML 编写和集群监控的智能助手。
-
+- [ ]  **(增强) 任务：集成基础可观测性 (Integrate Foundational Observability)**:
+    - [ ]  目标: 引入 CPU、内存等核心指标，为 AI 诊断提供量化数据支撑，并为用户提供基础的性能概览。
+    - [ ]  前提: 假设用户的集群已安装 Prometheus (或兼容的 Metrics Server)。
+    - [ ]  任务 1: 后端集成:    
+        - [ ]  在后端引入 Prometheus API 客户端库。
+        - [ ]  创建新的 API 路由，如 /api/metrics/pod，用于根据 Pod 名称查询其 CPU/内存使用率。
+    - [ ]  任务 2: 前端可视化:
+        - [ ]  在 Pod 和 Node 的详情页，使用 Recharts 组件，添加展示 CPU 和内存使用历史曲线的图表。
+    - [ ]  任务 3: AI 上下文增强:
+        - [ ]  修改 /api/ai/diagnose/pod: 在调用 LLM 之前，先去获取该 Pod 近期的 CPU/内存指标。
+        - [ ]  将“Pod 当前 CPU 使用率为 95% (limit 100%)”这样的量化信息，注入到 Prompt 的上下文中。这将极大提升 AI 诊断的准确性（例如，它可以从 CrashLoopBackOff 推断出更具体的 OOMKilled）。
+- [ ]  **(增强) 任务：资源关系拓扑图 MVP (Resource Topology Graph MVP)**:
+    - [ ]  目标: 提供一个可视化的、上帝视角的集群资源关系图，帮助用户快速理解应用架构和故障影响范围。
+    - [ ]  技术选型: 前端使用 ReactFlow 或 vis.js 等图表库。
+    - [ ]  任务 1: 后端拓扑 API (/api/k8s/topology):
+        - [ ]  创建一个 API，用于获取指定 Namespace 下的核心资源 (Deployments, StatefulSets, Services, Pods, Ingresses)。
+        - [ ]  在后端分析资源间的关系：
+            - [ ]  通过 metadata.ownerReferences 找到 Deployment -> ReplicaSet -> Pod 的父子关系。
+            - [ ]  通过 spec.selector 找到 Service 指向哪些 Pods。
+            - [ ]  通过 Ingress rules 找到 Ingress 指向哪个 Service。
+        - [ ]  将这些资源和关系，构造成一个图数据结构（节点和边）返回给前端。
+    - [ ]  任务 2: 前端拓扑图实现:
+        - [ ]  创建一个新的页面 /dashboard/topology。
+        - [ ]  调用上述 API 获取数据，并使用 ReactFlow 将其渲染成一个可视化的拓扑图。
+    - [ ]  任务 3: MVP 交互:
+        - [ ]  允许用户拖拽、缩放画布。
+        - [ ]  点击图中的节点（例如一个 Pod），可以弹出一个包含其核心信息和状态的侧边栏。
+        - [ ]  点击图中的边（例如一个 Service -> Pod 的箭头），可以高亮显示相关资源。
+- **阶段成果**: KubeCopilot 进化为一个多感官的智能助手，它不仅能“读懂”YAML，还能“看到”性能指标和资源间的拓扑关系，其 AI 建议的深度和广度得到质的飞跃。  
 ---
 
 ## **Phase 4: SRE 实践工具化 (SRE Practice Tooling)**
@@ -681,11 +709,10 @@ export const OperationPlanSchema = z.object({
     - [ ]  允许用户为 Service/Deployment 定义和追踪关键 SLI（可用性、延迟）。
     - [ ]  可视化展示 SLO 目标和当前错误预算的消耗情况。
     - [ ]  **风险引擎将集成错误预算作为决策因子**。
-- [ ]  **AI 辅助事后复盘 (AI-Assisted Postmortems)**:
-    - [ ]  提供一键生成复盘报告草稿的功能，自动聚合时间线、影响、日志和指标。
-- [ ]  **渐进式发布计划生成 (Progressive Rollout Plan Generation)**:
-    - [ ]  支持通过自然语言生成金丝雀发布、蓝绿部署的 OperationPlan 工作流。
-
+- [ ]  **(增强) 任务：AI 辅助事后复盘 (AI-Assisted Postmortems)**:
+    - [ ]  提供一键生成复盘报告草稿的功能，自动聚合时间线、影响、日志和指标。(增强): AI 生成的复盘报告，将自动包含事件发生时相关 Pod/Node 的性能指标快照图表，以及一个受影响服务的拓扑关系截图，极大提升报告质量。
+- [ ]  **(增强) 任务：渐进式发布计划生成 (Progressive Rollout Plan Generation)**:
+    - [ ]  支持通过自然语言生成金丝雀发布、蓝绿部署的 OperationPlan 工作流。AI 生成的金丝雀发布计划，会包含一个“监控”步骤，该步骤将主动监控新版 Pod 的 CPU/内存使用率和 SLI 指标，并基于这些量化数据来建议是继续发布还是自动回滚。
 ---
 
 ## **Phase 5 & Beyond: 迈向高级自动化与生态 (Towards Advanced Automation & Ecosystem)**

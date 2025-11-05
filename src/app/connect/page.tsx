@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useRouter } from 'next/navigation' // 导入 useRouter
 import { Button } from '@/components/ui/button'
 import {
@@ -23,6 +23,7 @@ export default function ConnectPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null) // 新增：用于存储错误信息
   const router = useRouter() // 初始化 router
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
 
   const handleConnect = async () => {
     setIsLoading(true)
@@ -37,17 +38,14 @@ export default function ConnectPage() {
         body: JSON.stringify({ kubeconfig }),
       })
 
-      // 解析 JSON 响应体，无论成功或失败
       const data = await response.json()
 
-      if (!response.ok) {
-        // 从后端返回的 JSON 中提取更详细的错误信息
-        throw new Error(
-          data.error || data.message || 'An unknown error occurred.',
-        )
+      if (!response.ok || data?.success === false) {
+        const errorMessage =
+          data?.error?.message || data?.message || 'An unknown error occurred.'
+        throw new Error(errorMessage)
       }
 
-      // 成功后跳转
       router.push('/')
     } catch (err: unknown) {
       console.error('Frontend Connect Error:', err) // 在浏览器控制台打印详细错误
@@ -61,6 +59,29 @@ export default function ConnectPage() {
     }
   }
 
+  const handleFileUpload = () => {
+    fileInputRef.current?.click()
+  }
+
+  const handleFileChange = async (
+    event: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    try {
+      const text = await file.text()
+      setKubeconfig(text)
+      setError(null)
+    } catch (fileError) {
+      console.error('Failed to read kubeconfig file', fileError)
+      setError('Unable to read the selected file. Please try again.')
+    } finally {
+      // reset input so selecting the same file again still triggers change
+      event.target.value = ''
+    }
+  }
+
   return (
     <main className="flex min-h-screen items-center justify-center bg-gray-50 p-4 dark:bg-gray-900">
       <Card className="w-full max-w-2xl">
@@ -69,6 +90,12 @@ export default function ConnectPage() {
           <CardDescription>
             Paste the contents of your kubeconfig file below. Your credentials
             are sent directly to the server and never stored in the browser.
+          </CardDescription>
+          <CardDescription className="text-muted-foreground text-xs">
+            提示：在本地运行{' '}
+            <code className="font-mono">kubectl config view --raw</code>{' '}
+            即可复制完整 kubeconfig；或在云控制台下载 kubeconfig
+            文件后使用下方“上传文件”按钮自动填充。
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -80,13 +107,33 @@ export default function ConnectPage() {
             </Alert>
           )}
           <div className="grid w-full gap-1.5">
-            <Label htmlFor="kubeconfig">Kubeconfig</Label>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="kubeconfig">Kubeconfig</Label>
+              <div className="flex gap-2">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".yaml,.yml,.json,text/*"
+                  className="hidden"
+                  onChange={handleFileChange}
+                />
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={handleFileUpload}
+                  disabled={isLoading}
+                >
+                  上传文件
+                </Button>
+              </div>
+            </div>
             <Textarea
               id="kubeconfig"
-              placeholder="apiVersion: v1
+              placeholder={`apiVersion: v1
 clusters:
 - cluster:
-    ..."
+    ...`}
               className="min-h-[300px] font-mono"
               value={kubeconfig}
               onChange={(e) => setKubeconfig(e.target.value)}

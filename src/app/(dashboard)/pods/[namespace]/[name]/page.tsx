@@ -1,109 +1,95 @@
-'use client'
-
-import { useK8sResource } from '@/hooks/useK8sResource'
-import { V1Pod, CoreV1Event } from '@kubernetes/client-node'
-import { Skeleton } from '@/components/ui/skeleton'
-import { PodInfoCard } from '@/components/k8s/PodInfoCard'
-import { EventsTable } from '@/components/k8s/EventsTable'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { PodContainersCard } from '@/components/k8s/pods/PodContainersCard'
+import { PodVolumesCard } from '@/components/k8s/pods/PodVolumesCard'
+import { PodInfoCard } from '@/components/k8s/pods/PodInfoCard'
+import { PodDiagnosisPanel } from '@/components/k8s/pods/PodDiagnosisPanel'
+import { EventsTable } from '@/components/k8s/shared/EventsTable'
+import { ReadOnlyYamlViewer } from '@/components/k8s/shared/ReadOnlyYamlViewer'
+import { ResourceDetailPage } from '@/components/k8s/shared/ResourceDetailPage'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { ReadOnlyYamlViewer } from '@/components/shared/ReadOnlyYamlViewer'
-import { PodContainersCard } from '@/components/k8s/PodContainersCard'
-import { Alert, AlertDescription } from '@/components/ui/alert'
-import { use } from 'react'
+import { parseK8sError } from '@/lib/api/error'
+import { getPodDetail } from '@/lib/k8s/services/pod.service'
+import { notFound, redirect } from 'next/navigation'
 
-// ... (接口和类型定义保持不变)
-interface PodDetailData {
-  detail: V1Pod
-  events: CoreV1Event[]
-  yaml: string
+type PageProps = {
+  params: Promise<{ name: string; namespace: string }>
 }
-type Params = Promise<{ namespace: string; name: string }>
 
-export default function PodDetailPage({ params }: { params: Params }) {
-  const { namespace, name } = use(params)
-  const { data, isLoading, isError } = useK8sResource<PodDetailData>(
-    `pods/${namespace}/${name}`,
-  )
+export default async function Page({ params }: PageProps) {
+  const { name, namespace } = await params
 
-  if (isLoading) {
-    return <PodDetailSkeleton /> // 骨架屏保持不变
+  let detail: Awaited<ReturnType<typeof getPodDetail>> | null = null
+  let error: ReturnType<typeof parseK8sError> | null = null
+
+  try {
+    detail = await getPodDetail(namespace, name, {
+      includeRaw: true,
+      includeYaml: true,
+    })
+  } catch (err) {
+    const apiError = parseK8sError(err)
+    if (apiError.statusCode === 404) {
+      notFound()
+    }
+    error = apiError
   }
 
-  if (isError) {
-    return (
-      <Alert variant="destructive">
-        <AlertDescription>
-          {isError?.message || 'Failed to load pod details.'}
-        </AlertDescription>
-      </Alert>
-    )
+  if (error?.statusCode === 401) {
+    redirect('/connect')
   }
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Pod: {name}</h1>
-        <p className="text-muted-foreground">Namespace: {namespace}</p>
-      </div>
-
-      <Tabs defaultValue="overview">
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="events">Events</TabsTrigger>
-          <TabsTrigger value="yaml">YAML</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="overview" className="mt-4 space-y-6">
-          <PodInfoCard pod={data?.detail} />
-          <PodContainersCard pod={data?.detail} />
-        </TabsContent>
-
-        <TabsContent value="events" className="mt-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Events</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <EventsTable events={data?.events} />
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="yaml" className="mt-4">
-          <ReadOnlyYamlViewer yamlString={data?.yaml || ''} />
-        </TabsContent>
-      </Tabs>
-    </div>
-  )
-}
-
-function PodDetailSkeleton() {
-  return (
-    <div className="space-y-6">
-      <div>
-        <Skeleton className="mb-2 h-8 w-1/2" />
-        <Skeleton className="h-4 w-1/4" />
-      </div>
-      <Card>
-        <CardHeader>
-          <Skeleton className="h-6 w-1/3" />
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <Skeleton className="h-4 w-full" />
-          <Skeleton className="h-4 w-full" />
-          <Skeleton className="h-4 w-5/6" />
-          <Skeleton className="h-4 w-full" />
-        </CardContent>
-      </Card>
-      <Card>
-        <CardHeader>
-          <Skeleton className="h-6 w-1/4" />
-        </CardHeader>
-        <CardContent>
-          <Skeleton className="h-32 w-full" />
-        </CardContent>
-      </Card>
-    </div>
+    <ResourceDetailPage
+      resourceBase="pods"
+      name={name}
+      namespace={namespace}
+      detail={detail}
+      error={error}
+      InfoCardComponent={PodInfoCard}
+      breadcrumbs={[
+        { label: 'Home', href: '/' },
+        { label: 'Pods', href: '/pods' },
+        { label: namespace, href: `/pods?namespace=${namespace}` },
+      ]}
+    >
+      {(detail) => (
+        <div className="space-y-6">
+          <PodDiagnosisPanel namespace={namespace} name={name} />
+          <Tabs defaultValue="containers" className="mt-4">
+            <TabsList className="grid w-full grid-cols-4 sm:w-auto">
+              <TabsTrigger value="containers">Containers</TabsTrigger>
+              <TabsTrigger value="volumes">Volumes</TabsTrigger>
+              <TabsTrigger value="events">Events</TabsTrigger>
+              <TabsTrigger value="yaml">YAML</TabsTrigger>
+            </TabsList>
+            <TabsContent value="containers" className="pt-4">
+              <div className="h-[32rem] overflow-auto pr-1">
+                <PodContainersCard pod={detail.summary} />
+              </div>
+            </TabsContent>
+            <TabsContent value="volumes" className="pt-4">
+              <div className="h-[32rem] overflow-auto pr-1">
+                <PodVolumesCard pod={detail.summary} />
+              </div>
+            </TabsContent>
+            <TabsContent value="events" className="pt-4">
+              <div className="h-[32rem] overflow-auto pr-1">
+                <EventsTable
+                  resourceBase="pods"
+                  namespace={namespace}
+                  name={name}
+                  uid={detail.summary.uid}
+                  kind="Pod"
+                />
+              </div>
+            </TabsContent>
+            <TabsContent value="yaml" className="pt-4">
+              <div className="h-[32rem] overflow-auto pr-1">
+                <ReadOnlyYamlViewer yaml={detail.yaml} raw={detail.raw} />
+              </div>
+            </TabsContent>
+          </Tabs>
+        </div>
+      )}
+    </ResourceDetailPage>
   )
 }

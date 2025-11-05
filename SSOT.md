@@ -4,270 +4,54 @@ KubeCopilot
 
 # **1. 项目愿景与定位 (Vision & Positioning)**
 
-- **最终愿景 (Ultimate Vision)**: 成为 SRE 和 DevOps 工程师的“Kubernetes 智能驾驶舱” (AI-Powered DevOps Cockpit)。它不仅仅是“看见”集群，更是能够“理解”集群状态，并能“建议”甚至“半自动执行”最佳实践操作的智能伙伴。
-- **当前定位 (Positioning)**: 一款**AI 增强的、轻量级的 Kubernetes 可视化面板**。我们从解决“看板只显示不解释”的痛点切入，逐步构建信任，最终实现完整的驾驶舱愿景。我们的定位介于“只读信息面板”和“全自动 PaaS 平台”之间。
+- **最终愿景 (Ultimate Vision)**: 成为 SRE 和 DevOps 工程师的 AI 原生基础设施层 (AI-Native Infra Layer)。KubeCopilot 通过结构化智能与自然语言接口，让团队以工程化方式治理复杂的 Kubernetes 系统。
+- **最终定位 (Positioning)**: 一款 AI 增强的 Kubernetes 智能驾驶舱 (AI-Powered DevOps Cockpit)。传统可视化工具只能展示资源状态，而 KubeCopilot 能理解、解释并生成结构化修复计划，让运维从“看图分析”转变为“对话驱动的决策执行”。
 
 # **2. 指导原则 / 设计哲学 (Guiding Principles)**
-
 - **AI Native (AI 原生)**: AI 不是附属品，而是核心交互和价值的来源。所有功能设计都将优先考虑如何利用 AI 提升效率和降低认知负担。
-- **MVP 优先 (MVP First)**: 严格遵循 P0 -> P1 -> P2 的优先级。先交付一个能用 AI “解释”集群的最小可用产品，验证核心价值，再逐步引入“写入”和“自动化”能力。
-- **安全默认 (Secure by Default)**: 所有写操作都必须经过 `OperationPlan` 的结构化审查。Kubeconfig 等敏感凭证的处理沿用最高安全标准，后端是唯一与 K8s API 通信的组件。
+- **安全默认 (Secure by Default)**: 所有写操作都必须经过 `OperationPlan` 的结构化审查（详见第 8 节）。Kubeconfig 等敏感凭证的处理沿用最高安全标准，后端是唯一与 K8s API 通信的组件。
 - **结构化与可审计 (Structured & Auditable)**: AI 的任何输出，特别是写操作建议，都必须是结构化的、可被机器校验的 (Schema-First)。所有变更必须留下清晰、不可篡改的审计日志。
-- **开发者体验至上 (DX First)**: 无论是最终用户的使用体验，还是我们自身的开发流程，都追求简洁、流畅和高效。
-- **参考 《SRE Google运维解密》**
-- **Prompt 可重用与可演化 (Prompt as Infra)**: 所有 Prompt 均作为可版本化的资源存在，支持迭代、评估与灰度发布。Prompt 不仅是指令，更是产品行为的一部分。
+- **Prompt 可重用与可演化 (Prompt as Infra)**: 所有 Prompt 均作为可版本化的资源存在，支持迭代、评估与灰度发布（详见第 9 节）。Prompt 不仅是指令，更是产品行为的一部分。
+        Prompt Registry (prompts/manifest.json):Prompt 
+        Pipeline：
+        所有 AI 请求都必须经过：
+        1️⃣ context builder → 2️⃣ prompt template loader → 3️⃣ LLM call → 4️⃣ schema validator → 5️⃣ risk annotator。
+        这使得 prompt 行为可追踪、可回滚、可评估。
 
-# 3. 角色与职责 (Roles & Responsibilities)
+# **3. SRE 核心思想与实践 (SRE Core Philosophy & Practices)**
 
-- **Human Developer**: 项目负责人 & 主程 (Project Lead & Lead Developer)。
-- **Gemini (AI in this web chat)**: AI 架构师 & 系统设计师 (AI Architect & System Designer)。
-- **本地 IDE AI (Copilot, etc.)**: AI 结对程序员 (AI Pair Programmer)。
+本章节旨在将 Google SRE 的最佳实践作为 KubeCopilot 的顶层设计原则，确保我们的产品不仅是一个工具，更是一个帮助团队践行 SRE 文化的智能伙伴。
 
-### 3.1 AI 协作模型 (AI Collaboration Model)
-
-- **目标**: 为解决 AI 无法直接访问本地代码库导致的上下文缺失问题，并提升长期协作效率，我们采纳一个**分层协作模型**，为不同的协作场景指定最高效的工具。
-
-- **模型分层**:
-    1.  **Gemini (Web Chat) - 战略指挥室 (Strategy Room)**:
-        - **职责**: 负责 SSOT 的维护、高阶架构设计、Roadmap 规划、核心技术决策和方向性问题的讨论。
-        - **定位**: 定义项目的 **“Why”** 和 **“What”**。
-
-    2.  **本地 IDE AI (VS Code w/ AI, GitHub Copilot) - 结对程序员 (Pair Programmer)**:
-        - **职责**: 在 IDE 中提供实时的代码自动补全、函数生成、代码片段解释和重构建议。
-        - **定位**: 辅助完成 **“How”** 的一线编码工作，它拥有完整的本地文件上下文。
-
-    3.  **Gemini CLI - 代码审查员 (Code Reviewer)**:
-        - **职责**: 在不离开终端的情况下，对单个或多个本地文件进行按需的、指令式的深度分析、审查和优化。
-        - **定位**: 解决“需要架构师审查本地代码，但又不想复制粘贴”的场景，是连接本地开发与战略审查的桥梁。
-
-- **推荐工作流**:
-    1.  **规划 (Web Chat)**: 在战略指挥室中共同确定下一个开发任务。
-    2.  **编码 (IDE)**: 在本地使用 AI 结对程序员高效编写代码。
-    3.  **审查 (CLI)**: (可选) 当需要对特定实现进行反馈时，使用 CLI 让 AI 对本地代码进行审查。
-    4.  **同步 (Web Chat)**: 完成任务后，在战略指挥室同步进度，并规划下一步行动。
-
-通过这种分层协作，KubeCopilot 项目能在保持「人类战略控制」的同时，充分利用不同层级 AI 的能力，形成一个自组织的智能开发系统。
-
-# 4. 技术栈 (Tech Stack)
-
-- **核心框架**: Next.js 14 (App Router), TypeScript
-    - *理由*: 全栈能力，统一前后端开发体验，完美契合我们“前端 UI + 后端安全代理/AI 编排器”的架构。
-- **UI 框架**: Tailwind CSS, shadcn/ui, Magic UI
-    - *理由*: 高度可定制的原子化 CSS，结合预制、符合无障碍标准的优美组件，能极大地提升开发效率和 UI 质量。
-- **状态管理**: Zustand
-    - *理由*: 轻量、简洁、无模板代码。对于需要跨组件共享的状态（如当前选择的 Namespace、集群连接状态），它是最理想的选择。
-- **后端核心**:
-    - **K8s 客户端**: @kubernetes/client-node
-        - *理由*: CNCF 官方 Node.js 客户端，是与 Kubernetes API Server 通信的标准和最可靠的方式。
-    - **数据库 ORM**: Prisma
-        - *理由*: 提供类型安全的数据库访问，简化数据库迁移和查询。能与 PostgreSQL (生产) 和 SQLite (本地开发) 无缝协作，是 Audit Store 和 OperationPlan 持久化的最佳选择。
-    - **数据库**: PostgreSQL (生产推荐), SQLite (本地开发)
-        - *理由*: PostgreSQL 功能强大、稳定可靠；SQLite 轻量零配置，非常适合本地快速启动和测试。
-- **AI 与数据校验**:
-    - **LLM 客户端**: openai 或 @google/generative-ai
-        - *理由*: 用于与大语言模型 API（如 OpenAI GPT 系列或 Google Gemini 系列）进行交互。
-        - **AI 客户端抽象层**: 我们将 AI 客户端实现为一个可插拔的模块，通过配置文件指定使用的模型（如 OpenAI、Google Gemini、Ollama 等）。这使得我们可以在不改变核心业务逻辑的情况下，轻松切换不同的 AI 模型。
-    - **Schema 校验**: Zod
-        - *理由*: **AI Native 架构的基石**。用于在后端严格校验 LLM 返回的 JSON 是否符合我们定义的 OperationPlan 等 Schema，确保 AI 输出的可靠性和安全性。
-- **编辑器与可视化**:
-    - **YAML 编辑器**: @monaco-editor/react
-        - *理由*: VS Code 的核心编辑器，提供一流的 YAML 编辑、语法高亮和校验体验，是 YAML Copilot 功能的不二之选。
-    - **[未来] 数据图表**: Recharts
-        - *理由*: 简单、组件化的图表库，非常适合未来集成 Prometheus 指标，展示 CPU/内存等监控图表。
-- **代码质量**: ESLint, Prettier, Husky
-    - *理由*: 保证代码风格统一、质量可靠的行业标准三件套。
-- **认证与会话管理库**:
-    - jsonwebtoken 和 bcryptjs。
-    - **理由**: 在“集群连接 & 基础布局”中，我们需要安全地管理用户会话。jsonwebtoken (JWT) 是实现无状态认证的行业标准，可以用来签发一个有时效性的 token，证明用户已成功连接。即便我们初期仅将会话信息存在内存中，使用 JWT 也是一个更规范、更安全的实践。bcryptjs 则是在我们未来可能支持用户名/密码登录时，用于密码哈希的标准库，提前纳入考量体现了我们的安全前瞻性。
-- **日志库**:
-    - pino 或 winston。
-    - **理由**: 一个好的后端服务必须有结构化的日志。pino 以其极高的性能和 JSON 结构化日志输出而著称，非常适合在 API 路由中记录请求、AI 操作、错误等信息，便于未来的日志分析和告警。
-- **部署与运行环境**:
-    - Docker + Kubernetes (自部署)
-    - [未来] Helm Chart 用于打包与发布
----
-
-# 5. 项目结构 (Project Structure)
-
-## **5.1 规划的项目结构**
-```
-kubecopilot/
-├── prisma/                 # Prisma 目录，存放数据库 Schema 和迁移文件
-│   └── schema.prisma
-├── prompts/                # 存放所有 LLM 的 Prompt 模板，便于管理和版本控制
-│   ├── diagnose-pod.md
-│   └── generate-operation-plan.md
-├── src/
-│   ├── app/
-│   │   ├── (dashboard)/      # 认证后才能访问的主看板布局和路由 (例如 /pods, /deployments)
-│   │   │   ├── layout.tsx
-│   │   │   └── page.tsx      # 集群概览页
-│   │   ├── connect/          # Kubeconfig 连接页面
-│   │   │   └── page.tsx
-│   │   └── api/              # 后端 API 路由
-│   │       ├── ai/             # AI 编排器核心端点
-│   │       │   ├── diagnose/   # AI 诊断 API
-│   │       │   ├── execute/    # 执行已确认的 OperationPlan
-│   │       │   └── plan/       # 根据用户意图生成 OperationPlan
-│   │       └── k8s/            # 作为安全代理，转发请求到 K8s API Server
-│   │           ├── namespaces/ # 【MVP 策略】为每个资源创建特定路由，以实现安全可控和数据定制化
-│   │           ├── pods/
-│   │           └── ...
-│   │           # [未来 V2] 可能会演进为 [..path] 动态代理模式，以支持更广泛的资源类型
-│   ├── components/
-│   │   ├── ai/               # AI 专属 UI 组件 (例如 PromptBar, PlanConfirmModal, AiDiagnosisPane)
-│   │   ├── ui/               # shadcn/ui 基础组件 (由 CLI 生成)
-│   │   ├── layout/           # 页面布局组件 (例如 Sidebar, Header)
-│   │   ├── k8s/              # K8s 专用组件 (例如 ResourceTable, StatusBadge)
-│   │   └── shared/           # 项目级共享组件 (例如 MonacoEditorWrapper)
-│   ├── lib/                  # 核心业务逻辑层 (后端，非 API 路由)
-│   │   ├── ai/               # 封装 LLM 客户端、Prompt 格式化、Zod Schema 定义
-│   │   ├── audit/            # 审计日志服务，负责写入和读取审计记录
-│   │   ├── db.ts             # Prisma 客户端单例初始化
-│   │   ├── k8s/              # 封装 @kubernetes/client-node，提供更易用的接口
-│   │   ├── risk-engine/      # 风险引擎的实现 (规则 + AI 评分)
-│   │   ├── utils.ts          # 通用工具函数
-│   │   └── schemas/
-│   │       ├── operation-plan.ts # Zod schema for OperationPlan
-│   │       └── ai-diagnosis.ts    # Zod schema for AI diagnosis output
-│   ├── hooks/                # 自定义 React Hooks (例如 useK8sResource, useAiStream)
-│   ├── types/                # 全局 TypeScript 类型定义 (例如 OperationPlan, K8s 资源类型)
-│   └── store/                # Zustand 状态管理 store
-├── .env.example            # 环境变量示例文件，需用户复制为 .env.local
-├── next.config.mjs         # Next.js 配置文件
-└── tsconfig.json           # TypeScript 配置文件```
-```
-
-## **5.2 当前的项目结构 (Current Project Structure)**
-
-```
-/home/dev/projects/kubecopilot/
-├───.eslintignore
-├───.gitignore
-├───.prettierrc.json
-├───components.json
-├───eslint.config.mjs
-├───next.config.ts
-├───package-lock.json
-├───package.json
-├───pnpm-lock.yaml
-├───postcss.config.mjs
-├───README.md
-├───SSOT.md
-├───tsconfig.json
-├───prisma/
-│   └───schema.prisma
-├───public/
-│   ├───file.svg
-│   ├───globe.svg
-│   ├───next.svg
-│   └───window.svg
-└───src/
-    ├───middleware.ts
-    ├───app/
-    │   ├───favicon.ico
-    │   ├───globals.css
-    │   ├───layout.tsx
-    │   ├───(dashboard)/
-    │   │   ├───layout.tsx
-    │   │   ├───page.tsx
-    │   │   ├───deployments/
-    │   │   │   ├───page.tsx
-    │   │   │   └───[namespace]/
-    │   │   │       └───[name]/
-    │   │   │           └───page.tsx
-    │   │   ├───namespaces/
-    │   │   │   ├───page.tsx
-    │   │   │   └───[name]/
-    │   │   │       └───page.tsx
-    │   │   ├───pods/
-    │   │   │   ├───page.tsx
-    │   │   │   └───[namespace]/
-    │   │   │       └───[name]/
-    │   │   │           └───page.tsx
-    │   │   └───services/
-    │   │       ├───page.tsx
-    │   │       └───[namespace]/
-    │   │           └───[name]/
-    │   │               └───page.tsx
-    │   ├───api/
-    │   │   └───k8s/
-    │   │       ├───connect/
-    │   │       │   └───route.ts
-    │   │       ├───deployments/
-    │   │       │   ├───route.ts
-    │   │       │   └───[namespace]/
-    │   │       │       └───[name]/
-    │   │       │           └───route.ts
-    │   │       ├───namespaces/
-    │   │       │   ├───route.ts
-    │   │       │   └───[name]/
-    │   │       │       └───route.ts
-    │   │       ├───pods/
-    │   │       │   ├───route.ts
-    │   │       │   └───[namespace]/
-    │   │       │       └───[name]/
-    │   │       │           └───route.ts
-    │   │       └───services/
-    │   │           ├───route.ts
-    │   │           └───[namespace]/
-    │   │               └───[name]/
-    │   │                   └───route.ts
-    │   └───connect/
-    │       └───page.tsx
-    ├───components/
-    │   ├───k8s/
-    │   │   ├───DeploymentInfoCard.tsx
-    │   │   ├───DeploymentsTable.tsx
-    │   │   ├───EventsTable.tsx
-    │   │   ├───NamespaceInfoCard.tsx
-    │   │   ├───NamespaceTable.tsx
-    │   │   ├───PodContainersCard.tsx
-    │   │   ├───PodInfoCard.tsx
-    │   │   ├───PodsTable.tsx
-    │   │   ├───ServiceInfoCard.tsx
-    │   │   └───ServicesTable.tsx
-    │   ├───layout/
-    │   │   ├───Header.tsx
-    │   │   └───Sidebar.tsx
-    │   ├───shared/
-    │   │   └───ReadOnlyYamlViewer.tsx
-    │   └───ui/
-    │       ├───alert.tsx
-    │       ├───badge.tsx
-    │       ├───button.tsx
-    │       ├───card.tsx
-    │       ├───dropdown-menu.tsx
-    │       ├───label.tsx
-    │       ├───skeleton.tsx
-    │       ├───table.tsx
-    │       ├───tabs.tsx
-    │       └───textarea.tsx
-    ├───hooks/
-    │   └───useK8sResource.ts
-    └───lib/
-        ├───session.ts
-        ├───utils.ts
-        └───k8s/
-            └───client.ts
-```
-
-## **5.3 已实现的核心组件与模式**
-
-本节记录项目在代码层面已实现的关键抽象和可复用单元，以反映当前工程进度。
-后端:   
-    - [x]  K8s 客户端工厂: 在 /lib/k8s/client.ts 中实现了基于 API Group 的客户端创建模式 (getK8sCoreV1Api, getK8sAppsV1Api)。
-    - [x]  会话管理: 实现了基于 globalThis 的内存会话存储，确保开发环境的热重载稳定性。
-    - [x]  特定资源 API 路由: 确立了为每个 K8s 资源创建独立、安全、定制化 API 路由的模式。
-前端:
-    - [x]  通用数据获取 Hook: 在 /hooks/useK8sResource.ts 中实现了基于 SWR 的通用数据获取 Hook。
-    - [x]  可复用详情页组件: 创建了 EventsTable, ReadOnlyYamlViewer 等可被多个资源详情页复用的核心组件。
-    - [x]  Tabs 布局模式: 确立了使用 Tabs 组件来组织详情页信息的标准布局。
+- **原则一: 消除琐碎工作 (Eliminating Toil)**
+    - **SRE 定义**: 琐碎工作是手动、重复、可自动化、无长久价值的工作。SRE 的目标是将其自动化或工程化解决。
+    - **KubeCopilot 实现**:
+        - **AI 诊断 (Phase 1)**: 将手动的 describe -> logs -> events 排错流程自动化，直接提供结构化洞察，是消除“诊断 Toil”的核心功能。
+        - **YAML Copilot (Phase 3)**: 通过 AI 辅助生成、解释和审查 YAML，大幅减少工程师在配置编写上的心智负担和重复劳动。
+        - **自然语言交互 (Phase 2)**: 用一句话代替多次点击和命令输入，是消除“操作 Toil”的终极形态。
+- **原则二: 拥抱风险与 SLO 驱动决策 (Embracing Risk & SLO-Driven Decisions)**
+    - **SRE 定义**: 100% 可靠性不现实。通过定义服务等级目标 (SLO) 和错误预算 (Error Budgets) 来量化可接受的风险，并以此作为发布和变更决策的数据依据。
+    - **KubeCopilot 实现**:
+        - **OperationPlan & 风险引擎 (Phase 2)**: 这是管理变更风险的基石。所有变更被计划、分级和审查，将模糊的风险变得清晰可控。
+        - **SLO/错误预算管理 (Phase 4)**: 在 KubeCopilot 中引入 SLO 定义和错误预算跟踪模块。AI 在生成 OperationPlan 时，会将**当前错误预算的消耗情况**作为风险评估的关键输入，例如：“警告：此变更将耗尽本月剩余错误预算，建议拒绝或在非高峰期执行。Risk Engine 将在 Phase 4 与 SLO 模块深度集成，使 OperationPlan 的风险评估与错误预算挂钩，实现「数据驱动的可靠性决策」。
+- **原则三: 安全渐进的自动化 (Safe, Progressive Automation)**
+    - **SRE 定义**: 自动化应从辅助手动操作演进到半自动工作流，最终才到全自动系统。信任是逐步建立的。
+    - **KubeCopilot 实现**:
+        - **清晰的演进路线**: 我们的路线图遵循了这一原则：Phase 1 (AI 辅助洞察) -> Phase 2 (人机确认的工作流) -> Phase 4 (探索半自动修复)，确保了自动化的安全性和可信度。
+        - **双重校验**: 任何写操作都需要人类的最终确认，这是在自动化和安全性之间找到的最佳平衡点。
+- **原则四: 无指责事后复盘 (Blameless Postmortems)**
+    - **SRE 定义**: 从故障中学习是提升系统可靠性的关键。复盘的目的是找到系统性问题并改进，而非追究个人责任。
+    - **KubeCopilot 实现**:
+        - **AI 辅助事后复盘 (Phase 4)**: 发生事件后，AI 能一键拉取 K8s Events、OperationPlan 审计日志、Prometheus 指标快照，自动生成一份包含**时间线、影响范围、初步根因分析、改进建议**的复盘报告草稿，极大地提升复盘效率和质量。所有故障事件的复盘报告将引用 AI 解释链 (XAI Context)，可追踪 Prompt 版本、模型版本、输入来源与信心水平。这构成了 KubeCopilot 的「Explainability Layer」。
+- **原则五: 渐进式部署 (Progressive Rollouts)**
+    - **SRE 定义**: 使用金丝雀发布、蓝绿部署等策略来控制变更的“爆炸半径”，是保障服务稳定性的重要手段。
+    - **KubeCopilot 实现**:
+        - **渐进式发布计划生成 (Phase 4)**: 用户可通过自然语言表达“将服务 X 金丝雀发布 10% 流量”，AI 将自动生成一个包含**部署新版、调整流量、监控 SLI、自动回滚/推进**等步骤的多步 OperationPlan，将复杂的发布流程标准化、安全化。
 
 
-# **6. 开发工作流 (Development Workflow)**
 
-### a. 环境管理 (开发 vs. 生产)
+# **4. 开发工作流 (Development Workflow)**
+
+### **a. 环境管理 (开发 vs. 生产)**
 
 - **方案**: 我们将严格使用**环境变量**来管理不同环境的配置。
 - **实现**: Next.js 内置了强大的环境变量支持。
@@ -277,7 +61,19 @@ kubecopilot/
     - next.config.js: 用于管理构建时的环境变量。
 - **原则**: 任何可能在不同环境间变化的配置（如 API 超时、日志级别等）都必须通过环境变量注入，而不是硬编码在代码里。
 
-### b. GitHub 分支管理
+> **环境配置速览**
+
+| 场景 | 主要文件/变量 | 说明 | 负责人 |
+| --- | --- | --- | --- |
+| 本地开发 | `.env.local`、`NEXT_PUBLIC_*` | 仅在开发机加载，包含实验性 API、调试开关 | 开发者 |
+| 共享默认 | `.env` | 可提交到仓库的公共配置，如默认超时、UI Flag | 架构组 |
+| 生产部署 | `.env.production`、平台 Secret Manager | 严禁提交到仓库；由运维注入真实凭证与限流参数 | SRE/平台团队 |
+| 构建时常量 | `next.config.js` | 对外公开的静态变量（如版本号、公开文案） | 前端团队 |
+| 运行时密钥 | Kubernetes Secret / Vault | LLM Key、数据库连接串，部署后通过环境变量注入 | 平台团队 |
+
+> **流程**：新增配置 → 在 `.env.example` 记录键名 → 说明是否必填及默认值 → 更新部署文档，确保开发/生产同步。
+
+### **b. GitHub 分支管理**
 
 - **方案**: 采用 **GitHub Flow**，这是一个轻量、高效、适合我们项目规模的分支模型。
 - **Commit Message 规范**:
@@ -312,16 +108,7 @@ kubecopilot/
         git branch -d feat/XXX
         git push origin --delete feat/XXX
 
-### c. 开发环境指南
-
-- **主要方案 (推荐)**: **本地 K8s 集群**。
-    - **平台**: WSL2 (针对 Windows 用户) 或原生的 Linux/macOS。
-    - **工具**: **k3d**。它允许使用 Docker 即时创建轻量级的 K3s 集群。我们将在 README.md 中提供详细的搭建指南。
-- **次要方案 (用于测试/CI)**: **云端 K8s 集群**。
-    - **服务商**: **Civo Cloud** 因其速度和简洁性而被推荐。其他云服务商的免费套餐（GKE, EKS, AKS）也同样可行。
-    - **用途**: 适用于在更真实的环境中进行测试，但由于网络延迟，不适合作为主要的开发循环环境。
-
-### d. 开发环境指南 (Development Environment Guide)
+### **c. 开发环境指南 (Development Environment Guide)**
 
 **核心原则**: 我们的开发环境必须最大限度地模拟生产环境（Linux），以遵循“开发-生产环境对等”的 SRE 最佳实践。
 
@@ -334,21 +121,33 @@ kubecopilot/
         - 清理集群: 当不再需要时，可以使用以下命令删除集群以释放资源：k3d cluster delete kubecopilot-dev
 - **环境一致性原则 (Principle of Environmental Congruence)**: 开发环境必须与目标生产环境（Linux）保持高度一致。我们坚持在 WSL2 内部进行所有开发，使用原生的 Linux 工具链。这一原则旨在从根源上消除“在我机器上能跑”的问题，确保我们构建的软件健壮、可靠，并符合 DevOps 最佳实践。
 
-### e. 测试策略 (Testing Strategy)
+### **d. 测试策略 (Testing Strategy)**
 
-我们采纳“测试金字塔”模型，并结合“MVP 优先”的原则，分阶段引入测试。
+我们采纳“测试金字塔”模型，分阶段引入测试。
 
 - **Phase 1 (当前阶段)**: **不引入测试**。此阶段主要为环境搭建和基础 UI 展示，业务逻辑极少。配置 `pre-commit` 钩子运行 `ESLint` 和 `Prettier` 来保证静态代码质量。
 - **Phase 2 (引入后端逻辑时)**: **引入单元/集成测试**。当开始开发 `AI 编排器`、`风险引擎` 和 `OperationPlan` 生成等核心后端逻辑时，我们将引入 `Jest` (或 `Vitest`) 作为测试框架。我们将为这些无 UI 的、处理关键数据和逻辑的模块编写详尽的单元测试和集成测试，确保其行为的正确性和稳定性。
 - **Phase 3 & Beyond (引入复杂 UI 交互时)**: **引入前端测试**。当开发如 `YAML Copilot`、`SLO 定义` 等包含复杂状态和用户交互的组件时，我们将引入 `React Testing Library` 和 `Jest-DOM` 来进行组件级别的单元和集成测试，确保前端行为符合预期。
 - **未来 (CI/CD 流水线成熟时)**: **引入端到端 (E2E) 测试**。我们将使用 `Playwright` 或 `Cypress`，在 CI 流程中针对 k3d 创建的临时集群，运行关键用户流程的自动化测试（如：连接集群 -> 通过自然语言伸缩 Deployment -> 验证结果）。
 
+### **f. 凭证与安全流程 (Credential Handling Flow)**
+
+| 步骤 | 描述 | 工具/存储 | 责任人 |
+| --- | --- | --- | --- |
+| 1. 前端提交 | `/connect` 页面通过 HTTPS 将原始 Kubeconfig POST 至 `/api/k8s/connect`，前端不持久化 | Next.js App Router | 前端 |
+| 2. 服务端校验 | `lib/k8s/connection.ts` 校验权限边界，拒绝越权 ClusterRole | @kubernetes/client-node | 平台团队 |
+| 3. 会话封装 | 通过 `iron-session` 加密存储（短期）或外部 Secret Store（中长期） | iron-session / Redis / Vault | 平台团队 |
+| 4. 请求代理 | 所有 `/api/k8s/*` 调用仅从安全代理获取凭证，前端绝不直连 K8s API | Secure Proxy | 后端 |
+| 5. 失效清理 | 会话到期或用户断开时销毁缓存，必要时吊销临时凭证 | Middleware、后台任务 | 平台团队 |
+
+> **注意**：所有写操作仍需通过 `OperationPlan` 审批（第 8 节），确保凭证与变更路径均处于受控状态。
+
 **测试技术栈**:
 - **测试运行器**: `Jest` 或 `Vitest`
 - **前端组件测试**: `React Testing Library`
 - **端到端测试**: `Playwright` (推荐) 或 `Cypress`
 
-### f. 前端 UI 迭代策略 (Frontend UI Iteration Strategy)
+### **g. 前端 UI 迭代策略 (Frontend UI Iteration Strategy)**
 
 - **核心原则**: 为践行“开发者体验至上 (DX First)”并允许未来对 UI 进行持续打磨，我们采用**“逻辑与视图分离”**的组件设计策略。
 - **实施方案**:
@@ -361,37 +160,106 @@ kubecopilot/
     4.  **重绑**: 将逻辑层中的状态和事件处理器（如 `value`, `onChange`, `onClick`）重新绑定到新的 JSX 元素上。
 - **优势**: 此策略确保了我们可以低风险、高效率地对产品 UI 进行迭代和优化，而无需重写已经稳定的核心业务逻辑。
 
+# **5. 技术栈 (Tech Stack)**
 
-# **7. SRE 核心思想与实践 (SRE Core Philosophy & Practices)**
+- **核心框架**: Next.js 14 (App Router), TypeScript
+    - *理由*: 全栈能力，统一前后端开发体验，完美契合我们“前端 UI + 后端安全代理/AI 编排器”的架构。
+- **UI 框架**: Tailwind CSS, shadcn/ui, Magic UI
+    - *理由*: 高度可定制的原子化 CSS，结合预制、符合无障碍标准的优美组件，能极大地提升开发效率和 UI 质量。
+- **状态管理**: Zustand
+    - *理由*: 轻量、简洁、无模板代码。对于需要跨组件共享的状态（如当前选择的 Namespace、集群连接状态），它是最理想的选择。
+- **后端核心**:
+    - **K8s 客户端**: @kubernetes/client-node
+        - *理由*: CNCF 官方 Node.js 客户端，是与 Kubernetes API Server 通信的标准和最可靠的方式。
+    - **数据库 ORM**: Prisma
+        - *理由*: 提供类型安全的数据库访问，简化数据库迁移和查询。能与 PostgreSQL (生产) 和 SQLite (本地开发) 无缝协作，是 Audit Store 和 OperationPlan 持久化的最佳选择。
+    - **数据库**: PostgreSQL (生产推荐), SQLite (本地开发)
+        - *理由*: PostgreSQL 功能强大、稳定可靠；SQLite 轻量零配置，非常适合本地快速启动和测试。
+- **AI 与数据校验**:
+    - **LLM 客户端**: openai 或 @google/generative-ai
+        - *理由*: 用于与大语言模型 API（如 OpenAI GPT 系列或 Google Gemini 系列）进行交互。
+        - **AI 客户端抽象层**: 我们将 AI 客户端实现为一个可插拔的模块，通过配置文件指定使用的模型（如 OpenAI、Google Gemini、Ollama 等）。这使得我们可以在不改变核心业务逻辑的情况下，轻松切换不同的 AI 模型。
+    - **Schema 校验**: Zod
+        - *理由*: **AI Native 架构的基石**。用于在后端严格校验 LLM 返回的 JSON 是否符合我们定义的 OperationPlan 等 Schema，确保 AI 输出的可靠性和安全性。
+- **编辑器与可视化**:
+    - **YAML 编辑器**: @monaco-editor/react
+        - *理由*: VS Code 的核心编辑器，提供一流的 YAML 编辑、语法高亮和校验体验，是 YAML Copilot 功能的不二之选。
+    - **数据图表**: Recharts
+        - *理由*: 简单、组件化的图表库，非常适合未来集成 Prometheus 指标，展示 CPU/内存等监控图表。
+- **代码质量**: ESLint, Prettier, Husky
+    - *理由*: 保证代码风格统一、质量可靠的行业标准三件套。
+- **认证与会话管理库**:
+    - jsonwebtoken 和 bcryptjs。
+    - **理由**: 在“集群连接 & 基础布局”中，我们需要安全地管理用户会话。jsonwebtoken (JWT) 是实现无状态认证的行业标准，可以用来签发一个有时效性的 token，证明用户已成功连接。即便我们初期仅将会话信息存在内存中，使用 JWT 也是一个更规范、更安全的实践。bcryptjs 则是在我们未来可能支持用户名/密码登录时，用于密码哈希的标准库，提前纳入考量体现了我们的安全前瞻性。
+- **日志库**:
+    - pino 或 winston。
+    - **理由**: 一个好的后端服务必须有结构化的日志。pino 以其极高的性能和 JSON 结构化日志输出而著称，非常适合在 API 路由中记录请求、AI 操作、错误等信息，便于未来的日志分析和告警。
+- **部署与运行环境**:
+    - Docker + Kubernetes (自部署)
+    - Helm Chart 用于打包与发布
+---
 
-本章节旨在将 Google SRE 的最佳实践作为 KubeCopilot 的顶层设计原则，确保我们的产品不仅是一个工具，更是一个帮助团队践行 SRE 文化的智能伙伴。
+# **6. 项目结构 (Project Structure)**
 
-- **原则一: 消除琐碎工作 (Eliminating Toil)**
-    - **SRE 定义**: 琐碎工作是手动、重复、可自动化、无长久价值的工作。SRE 的目标是将其自动化或工程化解决。
-    - **KubeCopilot 实现**:
-        - **AI 诊断 (Phase 1)**: 将手动的 describe -> logs -> events 排错流程自动化，直接提供结构化洞察，是消除“诊断 Toil”的核心功能。
-        - **YAML Copilot (Phase 3)**: 通过 AI 辅助生成、解释和审查 YAML，大幅减少工程师在配置编写上的心智负担和重复劳动。
-        - **自然语言交互 (Phase 2)**: 用一句话代替多次点击和命令输入，是消除“操作 Toil”的终极形态。
-- **原则二: 拥抱风险与 SLO 驱动决策 (Embracing Risk & SLO-Driven Decisions)**
-    - **SRE 定义**: 100% 可靠性不现实。通过定义服务等级目标 (SLO) 和错误预算 (Error Budgets) 来量化可接受的风险，并以此作为发布和变更决策的数据依据。
-    - **KubeCopilot 实现**:
-        - **OperationPlan & 风险引擎 (Phase 2)**: 这是管理变更风险的基石。所有变更被计划、分级和审查，将模糊的风险变得清晰可控。
-        - **[未来] SLO/错误预算管理 (Phase 4)**: 在 KubeCopilot 中引入 SLO 定义和错误预算跟踪模块。AI 在生成 OperationPlan 时，会将**当前错误预算的消耗情况**作为风险评估的关键输入，例如：“警告：此变更将耗尽本月剩余错误预算，建议拒绝或在非高峰期执行。”
-- **原则三: 安全渐进的自动化 (Safe, Progressive Automation)**
-    - **SRE 定义**: 自动化应从辅助手动操作演进到半自动工作流，最终才到全自动系统。信任是逐步建立的。
-    - **KubeCopilot 实现**:
-        - **清晰的演进路线**: 我们的路线图遵循了这一原则：Phase 1 (AI 辅助洞察) -> Phase 2 (人机确认的工作流) -> Phase 4 (探索半自动修复)，确保了自动化的安全性和可信度。
-        - **双重校验**: 任何写操作都需要人类的最终确认，这是在自动化和安全性之间找到的最佳平衡点。
-- **原则四: 无指责事后复盘 (Blameless Postmortems)**
-    - **SRE 定义**: 从故障中学习是提升系统可靠性的关键。复盘的目的是找到系统性问题并改进，而非追究个人责任。
-    - **KubeCopilot 实现**:
-        - **[未来] AI 辅助事后复盘 (Phase 4)**: 发生事件后，AI 能一键拉取 K8s Events、OperationPlan 审计日志、Prometheus 指标快照，自动生成一份包含**时间线、影响范围、初步根因分析、改进建议**的复盘报告草稿，极大地提升复盘效率和质量。
-- **原则五: 渐进式部署 (Progressive Rollouts)**
-    - **SRE 定义**: 使用金丝雀发布、蓝绿部署等策略来控制变更的“爆炸半径”，是保障服务稳定性的重要手段。
-    - **KubeCopilot 实现**:
-        - **[未来] 渐进式发布计划生成 (Phase 4)**: 用户可通过自然语言表达“将服务 X 金丝雀发布 10% 流量”，AI 将自动生成一个包含**部署新版、调整流量、监控 SLI、自动回滚/推进**等步骤的多步 OperationPlan，将复杂的发布流程标准化、安全化。
+## **6.1 规划的项目结构 — 面向模块化生长 (Composable Growth)**
 
-# **8. 核心架构 (Core Architecture)**
+> 目标：保持当前单体（Next.js App Router + Edge Functions）高效迭代，同时为未来拆分成多个微服务 / 独立工作负载预埋边界。核心策略是“先模块化，再服务化”。
+
+```
+kubecopilot/
+├── apps/                          # 运行时入口层，可扩展到多个前后端应用
+│   └── console/                   # (现状) Next.js 单体；未来可抽象为前端独立应用
+│       ├── app/                   # App Router：UI、路由、适配层
+│       ├── middleware.ts          # 前端侧会话 / feature flag
+│       └── public/                # 静态资源
+├── services/                      # 面向微服务的运行时单元（Phase 2+）
+│   ├── core-api/                  # K8s 读写、会话、权限；可迁移到独立 Node/Go 服务
+│   ├── ai-orchestrator/           # Prompt registry、LLM pipeline、评估任务
+│   └── audit-ledger/              # OperationPlan、审计日志、事件回放
+├── packages/                      # 可被 apps/services 复用的领域包（支持 pnpm/npm workspace）
+│   ├── domain-k8s/                # Kubernetes DTO、用例、策略；当前 `src/lib/k8s/**`
+│   ├── domain-ai/                 # Prompt schema、AI 风险模型；当前 `src/lib/ai/**`
+│   ├── infra-http/                # fetch/node-fetch 封装、错误协议；当前 `src/lib/api/**`
+│   ├── ui-kit/                    # 设计体系组件；当前 `src/components/**`
+│   └── telemetry/                 # 监控、审计、日志统一 SDK（待引入）
+├── prisma/                        # 数据访问层；迁移时可被 core-api 重用
+├── prompts/                       # Prompt Registry（版本化资源）
+├── patches/                       # 对第三方依赖的 patch-package (确保 deterministic build)
+├── tools/                         # 脚本、代码生成、评估工具（未来补充）
+├── SSOT.md / README.md            # 架构 & 团队对齐文档
+└── package.json / pnpm-workspace.yaml (未来) / turbo.json (未来)
+```
+
+**演进路径**
+
+1. **Phase A（当前）**：保留 `apps/console` 单体形态，持续在 `packages/` 思维下划分目录（即便物理仍在 `src/lib/**`，也要遵循包边界约束：禁止“跨领域”导入内部实现）。
+2. **Phase B（边界固化）**：引入工作区（pnpm workspace 或 turborepo），把 `src/lib/k8s/*`、`src/lib/ai/*` 等迁入 `packages/`，并通过 barrel export + lint 限制交叉引用；在 `services/` 下创建占位（stub）服务，复用同一套 domain 包。
+3. **Phase C（服务化拆分）**：当某一领域需要独立扩容或安全隔离（如 `ai-orchestrator` 访问外部 LLM），将其迁到独立部署单元，只需替换 `apps/console` 中的 API 网关地址，domain 包和 DTO 保持不变，实现“无痛拆分”。
+
+通过上述规划，团队可以在保持交付速度的同时，逐步获得清晰的领域界限、可组合的包，以及天然支持微服务/多运行时的架构骨架。
+
+
+## **6.2 当前的项目结构 (Current Project Structure)**
+
+- `src/app/(dashboard)`：按资源域划分页面（pods/deployments/...）；App Router 的服务器组件负责拉取数据并拼装 UI，`layout.tsx` 统一壳层，`events/` 页面提供全局事件时间线。
+- `src/app/api`：  
+  - `api/k8s/**/[[...path]]/route.ts` 为各资源提供统一入口（列表、详情、events、搜索），路由层只解析参数，业务交由 `lib/k8s/services`。  
+  - `api/ai/diagnose` 等目录承载 AI 调用代理，复用 `lib/ai` 的 prompt pipeline。  
+  - `api/k8s/search` 提供跨资源搜索/聚合。
+- `src/components/k8s`：以资源为单位拆分 UI 组件，`shared/` 下的 `EventsTable.tsx`、`ReadOnlyYamlViewer.tsx`、`ResourceDetailPage.tsx`、`ResourceTable.tsx` 提供一致的详情体验；`k8s/**` 内的卡片、表格消费 typed DTO。
+- `src/components/ui` & `src/components/layout`：封装 UI 基础组件（基于 shadcn/ui）与全局导航、搜索栏等布局元素。
+- `src/hooks/useK8sResource.ts`：集中处理 SWR 数据流、轮询、状态管理，为 Dashboard 页面提供统一的数据获取体验。
+- `src/lib`：  
+  - `lib/k8s/services` / `transformers` / `types` / `utils`：Kubernetes 领域逻辑；`connection.ts` 与 `client.ts` 负责 kubeconfig、API client 生命周期。  
+  - `lib/api`：HTTP 响应包装、错误类型、验证。  
+  - `lib/ai`：Prompt schema、LLM 请求封装（与 `prompts/` 的 manifest 对齐）。  
+  - `lib/formatters`：跨模块复用的展示格式化函数。
+- `prisma/`：数据模型定义；`src/generated/prisma` 为自动生成的 Prisma Client（只读）。
+- `prompts/`：LLM 提示语模板与 manifest；`patches/` 存放 `patch-package` 生成的依赖补丁，保证构建一致性。
+- 其他：`AGENTS.md` / `GEMINI.md` 等说明文档，`eslint.config.mjs` / `postcss.config.mjs` / `tailwind` 配置支撑工程化标准。
+
+
+# **7. 核心架构 (Core Architecture)**
 
 ```mermaid
 graph TD
@@ -439,34 +307,28 @@ graph TD
 - **审计存储 (Audit Store)**: 记录所有重要操作，尤其是 AI 生成的计划和用户的确认行为，提供不可篡改的追溯依据。
 - **[未来考量]**: 为支持未来的高可用部署，会话存储需要从内存模式平滑升级到外部共享存储模式（如 Redis）。
 
+> **职责矩阵**
 
-### 8.1 核心架构原则 (Core Architecture Principles)
+| 模块 | 主要职责 | 当前实现 | 可独立部署 | 关键依赖 |
+| --- | --- | --- | --- | --- |
+| 前端 Console | UI、命令面板、PlanConfirmModal、可视化 | Next.js App Router | ✅（Phase 3 以后） | `packages/ui-kit`、API 网关 |
+| K8s Secure Proxy | 转发 REST/gRPC、凭证校验、资源聚合 | Next.js Route Handler / `services/core-api` 预留 | ✅ | Kubernetes API Server、Prisma |
+| AI Orchestrator | Prompt Registry、LLM 调用、RiskAnnotator | Next.js Route Handler / `services/ai-orchestrator` 预留 | ✅ | LLM Provider、Prompt Manifest |
+| Risk Engine | 计划风险打分、错误预算策略 | `packages/domain-ai`（Phase 2 简化规则） | ✅ | OperationPlan 审计库、SLO 模块 |
+| Audit Ledger | OperationPlan 生命周期、执行审计 | Prisma（PostgreSQL/SQLite） | ⚠️（需共享数据库） | 数据库、身份体系 |
+| Telemetry 层 | 请求日志、metrics、tracing | 待引入 `packages/telemetry` | ✅ | OpenTelemetry、日志管线 |
 
-这些原则是我们所有后端代码设计和重构的最高准则，旨在确保代码库的长期健康、可维护性和安全性。
-
-1.  **DRY (Don't Repeat Yourself - 不要重复自己)**
-    - **定义**: 任何一段知识（代码逻辑、配置）在系统中都应该有单一、无歧义、权威的表示。
-    - **KubeCopilot 实践**:
-        - **会话管理**: 所有与会话存储（`sessionStore`）的交互逻辑，必须被封装在共享模块中（如 `/lib/session.ts`）。API 路由本身不应直接实现会话存储。
-        - **K8s 客户端实例化**: 创建 Kubernetes API 客户端的逻辑必须被封装在 /lib/k8s/client.ts 中。
-            - **核心工厂 (loadKubeConfig)**: 必须存在一个核心的、可复用的工厂函数，其唯一职责是根据会话 ID 加载并返回一个经过认证的 KubeConfig 对象。
-            - **专用客户端函数**: 针对不同的 Kubernetes API Group（如 CoreV1Api, AppsV1Api），必须创建独立的、具名的导出函数（如 getK8sCoreV1Api, getK8sAppsV1Api）。这些函数内部都应调用核心的 loadKubeConfig 工厂，以确保逻辑的一致性和代码的 DRY 原则。当前使用sessionId来获取。
-
-2.  **关注点分离 (Separation of Concerns)**
-    - **定义**: 不同的功能模块应该处理不同的事情，并尽量减少彼此之间的重叠。
-    - **KubeCopilot 实践**:
-        - **API 路由层 (`/app/api/**`)**: 其唯一职责是处理 HTTP 请求和响应。包括：解析请求、调用业务逻辑、格式化响应数据和处理 HTTP 错误。
-        - **业务逻辑层 (`/lib/**`)**: 包含核心的、可复用的业务逻辑。例如，与 K8s 的交互、AI 编排、数据库操作等。这一层应该是“纯粹的”，不应包含任何 `NextRequest` 或 `NextResponse` 相关的代码。
-
-3.  **数据最小化原则 (Data Minimization)**
-    - **定义**: API 端点应只返回前端明确需要的字段，而不是将从上游（如 K8s API）获取的整个庞大对象直接透传。
-    - **KubeCopilot 实践**:
-        - 在每个数据获取 API (如 `/api/k8s/namespaces`) 的最后一步，必须有一个明确的 `map` 或转换操作，从完整的 K8s 资源对象中，只挑选出 UI 需要的字段（如 `name`, `status`, `creationTimestamp`）来构建响应体。
-
-
-# 9. 核心数据结构:OperationPlan
+# 8. 核心数据结构:OperationPlan
 
 这是连接 AI 与 Kubernetes 的核心契约，**是本项目最重要的抽象**。所有写操作都必须先被封装成一个OperationPlan。
+关键结构与解释逻辑
+    Pre-Execution Check：执行前再次比对 diff.before 与当前资源状态，防止状态漂移。
+    Action Whitelist：AI 仅可在白名单内生成 Plan。
+    Schema Versioning：OperationPlan 的 Zod Schema 需带版本号，确保升级时兼容性。
+    三层可视化模型：
+        层 1：自然语言摘要
+        层 2：结构化 Patch 列表
+        层 3：Side-by-Side YAML Diff (默认折叠)
 
 **Schema (Zod 定义):**
 
@@ -484,28 +346,50 @@ const jsonPatchSchema = z.array(
 
 export const OperationPlanSchema = z.object({
   id: z.string().uuid(),
+  version: z.string().default('1'),
   status: z.enum(['pending', 'confirmed', 'executed', 'failed', 'reverted']),
   action: z.enum(['create', 'update', 'delete', 'scale', 'restart']),
+  steps: z
+    .array(
+      z.object({
+        id: z.string(),
+        action: z.enum(['create', 'update', 'delete', 'scale', 'restart']),
+        description: z.string(),
+        patch: jsonPatchSchema.optional(),
+        rollbackPatch: jsonPatchSchema.optional(),
+      }),
+    )
+    .default([]),
   resource: z.object({
     kind: z.string(),
     namespace: z.string(),
     name: z.string(),
+    uid: z.string().optional(),
+    resourceVersion: z.string().optional(),
   }),
   diff: z.object({
     // 用于执行前终态检查和 UI 深度对比的完整资源快照
     before: z.record(z.string(), z.any()).nullable(),
     // 用于高效存储和清晰展示变更核心的 JSON Patch
     patch: jsonPatchSchema,
+    patchFormat: z.enum(['rfc6902', 'strategic-merge']).default('rfc6902'),
+    rollbackPatch: jsonPatchSchema.optional(),
   }),
   risk: z.object({
     level: z.enum(['low', 'medium', 'high']),
     rationale: z.string(), // AI/规则给出的风险评估理由
+    score: z.number().min(0).max(1).nullable(),
+    factors: z.array(z.string()).default([]),
+    sloBudgetImpact: z.enum(['none', 'low', 'medium', 'high']).optional(),
+    postConditions: z.array(z.string()).default([]),
   }),
   aiRationale: z.string(), // AI 解释为什么要做这个操作
   audit: z.object({
     requestedBy: z.string(), // 'user:alice' or 'ai:anomaly-detector'
     confirmedBy: z.string().nullable(),
     executedBy: z.string(),
+    idempotencyKey: z.string().optional(),
+    sourcePromptId: z.string().optional(),
     timestamps: z.object({
       createdAt: z.date(),
       confirmedAt: z.date().nullable(),
@@ -515,6 +399,70 @@ export const OperationPlanSchema = z.object({
     }),
   }),
 });
+```
+
+**示例：Deployment 重启计划**
+
+```json
+{
+  "id": "8f4f3b3d-1c0d-4f0c-9f6f-2d0c4c0b5c1a",
+  "version": "1",
+  "status": "pending",
+  "action": "restart",
+  "steps": [
+    {
+      "id": "step-1",
+      "action": "update",
+      "description": "Annotate deployment to trigger rollout",
+      "patch": [
+        { "op": "add", "path": "/spec/template/metadata/annotations/restart.kubecopilot.io~1ts", "value": "2025-01-12T06:20:00Z" }
+      ],
+      "rollbackPatch": [
+        { "op": "remove", "path": "/spec/template/metadata/annotations/restart.kubecopilot.io~1ts" }
+      ]
+    }
+  ],
+  "resource": {
+    "kind": "Deployment",
+    "namespace": "payments",
+    "name": "billing-api",
+    "uid": "c0327b2f-2b63-4c50-9b1b-95cb5b0b0d5f",
+    "resourceVersion": "123456"
+  },
+  "diff": {
+    "before": { "...": "omitted for brevity" },
+    "patch": [
+      { "op": "add", "path": "/spec/template/metadata/annotations/restart.kubecopilot.io~1ts", "value": "2025-01-12T06:20:00Z" }
+    ],
+    "patchFormat": "rfc6902",
+    "rollbackPatch": [
+      { "op": "remove", "path": "/spec/template/metadata/annotations/restart.kubecopilot.io~1ts" }
+    ]
+  },
+  "risk": {
+    "level": "medium",
+    "rationale": "Rolling restart of production workload",
+    "score": 0.42,
+    "factors": ["traffic_spike_window"],
+    "sloBudgetImpact": "medium",
+    "postConditions": ["All pods reach Ready state within 5 minutes"]
+  },
+  "aiRationale": "Deployment pods are stuck in CrashLoopBackOff; restart to refresh configuration.",
+  "audit": {
+    "requestedBy": "user:alice",
+    "confirmedBy": null,
+    "executedBy": "system",
+    "idempotencyKey": "plan-billing-api-restart-20250112",
+    "sourcePromptId": "diagnose-pod@1.1.0",
+    "timestamps": {
+      "createdAt": "2025-01-12T06:19:55.000Z",
+      "confirmedAt": null,
+      "executedAt": null,
+      "failedAt": null,
+      "revertedAt": null
+    }
+  }
+}
 ```
 - **核心挑战 1**: 从机器语言到人类直觉 (Core Challenge: From Machine Language to Human Intuition)
     - **问题**: OperationPlan 内部采用 JSON Patch 格式来高效存储变更，但这对于人类用户是难以直接阅读的。为了在 PlanConfirmModal 中提供直观、无歧义的变更审查体验，我们必须将机器友好的数据结构翻译成人类友好的可视化界面。
@@ -534,6 +482,10 @@ export const OperationPlanSchema = z.object({
     - **Pre-Execution Check (执行前终态检查)**: 在执行 /api/ai/execute 时，系统必须在执行操作前，重新从 K8s API 获取资源的当前状态，并与 OperationPlan.diff.before 快照进行对比。若不一致，必须中止操作并向用户报告。
     - **Action Whitelist (操作白名单)**: AI 编排器在生成 OperationPlan 后，必须根据一个硬编码的 (action, resource.kind) 白名单进行校验。例如，初期白名单可能只包含 ('restart', 'Deployment'), ('scale', 'Deployment')。任何不在白名单内的计划都将被拒绝。
     - **理由**: 这两条原则是“安全默认”设计哲学的具体代码实现，能从根本上杜绝状态漂移和 AI “越权”操作带来的风险，是我们构建可信赖写操作的基石。
+- **补充说明 3**: 多步骤计划与回滚准备
+    - 当 `steps[]` 非空时，每个步骤需绑定可选 `rollbackPatch`，执行器在失败时按照逆序套用，保证“可恢复”能力。
+    - `idempotencyKey` 使执行端可以安全重试，`sourcePromptId` 将 OperationPlan 与 Prompt Registry 的条目串联，方便追溯 AI 决策来源。
+    - 执行前除了对比 `diff.before`，还需要校验 `resource.resourceVersion` 是否与 K8s 当前值匹配，确保不会覆盖外部更新。
 
 - **OperationPlan 差异可视化**：从机器语言到人类直觉 (Diff Visualization: From Machine Language to Human Intuition)
     - **核心挑战**: OperationPlan 内部采用 JSON Patch 格式高效存储变更，但这对于人类用户是难以阅读的。为了在 PlanConfirmModal 中提供直观、无歧义的变更审查体验，我们必须将机器友好的数据结构翻译成人类友好的可视化界面。
@@ -559,6 +511,74 @@ export const OperationPlanSchema = z.object({
         形式: 类似 GitHub PR 的、高亮的、并排 YAML 差异对比。
     实现: 此视图默认折叠。点击展开后，前端将使用 OperationPlan 中缓存的 before 状态，并动态应用 JSON Patch 来生成 after 状态，然后使用 react-diff-viewer 等库进行渲染。
     战略价值: 此策略完美践行了“开发者体验至上”的原则。它通过信息分层，既为快速、低风险的操作提供了流畅的确认流程，也为复杂、高风险的变更提供了最高级别的安全审查能力，在效率和严谨之间取得了最佳平衡。
+
+# 9. 核心数据结构： Prompt Registry & Schema Governance
+
+为落地 “Prompt as Infra”，新增 Prompt Registry
+```json
+[
+  {
+    "id": "diagnose-pod",
+    "version": "1.1.0",
+    "schemaRef": "ai-diagnosis.zod.ts",
+    "lastEvaluated": "2025-10-15",
+    "approved": true,
+    "model": "gpt-4.2",
+    "temperature": 0.2,
+    "maxTokens": 1200,
+    "envAllowlist": ["prod", "staging"],
+    "riskTier": "low",
+    "category": "diagnostics",
+    "owner": "ai-platform",
+    "reviewedBy": ["sre-lead", "ml-safety"],
+    "changelog": [
+      {
+        "version": "1.1.0",
+        "date": "2025-10-15",
+        "notes": "Improved node pressure hints"
+      }
+    ],
+    "evaluationMetrics": {
+      "accuracy": 0.87,
+      "coverage": 0.92,
+      "lastRun": "2025-10-12"
+    },
+    "inputSchemaRef": "diagnose-pod.input.zod.ts",
+    "outputSchemaRef": "diagnose-pod.output.zod.ts",
+    "rollout": {
+      "strategy": "percentage",
+      "stages": [
+        { "percent": 10, "conditions": ["staging-only"] },
+        { "percent": 50, "conditions": ["errorRate < 5%"] },
+        { "percent": 100, "conditions": ["manual-approval"] }
+      ]
+    }
+  }
+]
+```
+
+Prompt Pipeline
+
+所有 AI 请求必须经过统一管线：
+```json
+contextBuilder → promptLoader → LLM call → ZodValidator → RiskAnnotator
+```
+收益：Prompt 可治理、可追溯、可灰度发布，为未来商业版打基础。
+
+- **治理补充**：  
+  - `inputSchemaRef` / `outputSchemaRef` 确保上下游以同一契约交互，Zod 校验失败时需触发 fallback prompt 或中止执行并上报。  
+  - `evaluationMetrics` 与 `rollout` 字段使我们可以记录离线测评结果、逐步扩大覆盖面，并结合 `envAllowlist` 控制不同环境的启用策略。  
+  - `owner`、`reviewedBy`、`changelog` 构成完整的 Prompt 审批链；任何改动必须通过 Registry 提交，执行器基于 `riskTier` 与 `model` 选择对应的安全策略。  
+  - RiskAnnotator 可依据 `riskTier`、最近指标自动调高人类审核阈值，例如高风险 Prompt 默认要求 OperationPlan 再经过人工确认。
+
+> **发布流程**
+>
+> 1. **草稿**：维护者更新 `prompts/manifest.json` 与对应模板，提交 PR。  
+> 2. **自动验证**：CI 运行 manifest 校验脚本，检查 schema 引用、灰度配置、评估指标是否填写。  
+> 3. **人工审核**：`owner` 指派评审（SRE/AI 审核）确认风险、合规性，必要时补充评估报告。  
+> 4. **灰度发布**：根据 `rollout.strategy` 逐步扩大覆盖，监控 `evaluationMetrics`。  
+> 5. **正式上线**：满足退出条件后，将 `approved` 标记为 true 并记录 `changelog`。若指标恶化则回滚至前一版本或启用 fallback prompt。
+
 
 # **10. 开发路线图 (Revised Roadmap)**
 
@@ -609,122 +629,191 @@ export const OperationPlanSchema = z.object({
         - [x]  Deployments 详情页
         - [x]  Services 详情页
         - [x]  Namespaces 详情页
-- [ ]  **AI 洞察 MVP (AI Insight MVP)**:
-    - [ ]  任务 1: UI 实现: 在 Pod 详情页，添加一个“AI 诊断”按钮和一个用于展示结果的面板 (可以使用 Alert 或 Accordion 组件)。
-    - [ ]  任务 2: 后端 API (/api/ai/diagnose/pod):
-        - [ ]  创建 API 路由，接收 namespace 和 podName。
-        - [ ]  调用 K8s 客户端，并行获取该 Pod 的 describe (通过 readNamespacedPod)、events (通过 listNamespacedEvent 并按 involvedObject 过滤) 和 logs (通过 readNamespacedPodLog)。
-        - [ ]  (新) 数据预处理: 对获取的日志进行初步清洗，移除过长的、重复的行，为 LLM 准备一个干净的上下文。
-    - [ ]  任务 3: AI Prompt 与解析:
-        - [ ]  在 /prompts 目录下创建 diagnose-pod.md，设计一个包含上下文、角色扮演和结构化输出要求的 Prompt 模板。
-        - [ ]  调用 LLM Provider API，并使用 Zod Schema (ai-diagnosis.ts) 严格校验返回的 JSON。
-    - [ ]  任务 4: 前端渲染: 前端接收到结构化的 JSON 后，使用 Badge、列表等组件将其美观地展示出来（例如：Status: Unhealthy Reason: CrashLoopBackOff Suggestion: ...）。
-- [ ]  **核心资源广度覆盖 (Broaden Core Resource Coverage)**:
-    - [ ]  目标：快速提升 KubeCopilot 作为“只读 Dashboard”的实用性，让用户能看到最常用的 K8s 资源。
-    增加核心工作负载资源:
-    - [ ]  StatefulSets (列表/详情页)
-    - [ ]  DaemonSets (列表/详情页)
-    - [ ]  Jobs & CronJobs (列表/详情页)
-    增加配置与存储资源:
-    - [ ]  ConfigMaps (列表/详情页，详情页高亮显示 data)
-    - [ ]  Secrets (列表/详情页，详情页对 Secret value 进行模糊化/隐藏处理，提供“显示”按钮)
-    - [ ]  PersistentVolumeClaims (PVCs) & PersistentVolumes (PVs) (列表/详情页)
-    增加网络资源:
-    - [ ]  Ingresses (列表/详情页)
-    增加集群级资源:
-    - [ ]  Nodes (列表/详情页)
-    增加事件资源:
-    - [ ]  Events (提供一个全局的、可过滤的事件查看页面)
+- [x]  **AI 洞察 MVP (AI Insight MVP)**:
+    - [x]  任务 1: UI 实现: 在 Pod 详情页，添加一个“AI 诊断”按钮和一个用于展示结果的面板 (可以使用 Alert 或 Accordion 组件)。
+    - [x]  任务 2: 后端 API (/api/ai/diagnose/pod):
+        - [x]  创建 API 路由，接收 namespace 和 podName。
+        - [x]  调用 K8s 客户端，并行获取该 Pod 的 describe (通过 readNamespacedPod)、events (通过 listNamespacedEvent 并按 involvedObject 过滤) 和 logs (通过 readNamespacedPodLog)。
+        - [x]  (新) 数据预处理: 对获取的日志进行初步清洗，移除过长的、重复的行，为 LLM 准备一个干净的上下文。
+    - [x]  任务 3: AI Prompt 与解析:
+        - [x]  在 /prompts 目录下创建 diagnose-pod.md，设计一个包含上下文、角色扮演和结构化输出要求的 Prompt 模板。
+        - [x]  调用 LLM Provider API，并使用 Zod Schema (ai-diagnosis.ts) 严格校验返回的 JSON。
+    - [x]  任务 4: 前端渲染: 前端接收到结构化的 JSON 后，使用 Badge、列表等组件将其美观地展示出来（例如：Status: Unhealthy Reason: CrashLoopBackOff Suggestion: ...）。
+- [x]  **核心资源广度覆盖 (Broaden Core Resource Coverage)**:
+    目标：快速提升只读 Dashboard 的实用性。沿用现有“列表 + ResourceDetailPage + Events/YAML”骨架，确保每个新增资源都具备完整的详情 tabs。
+    - [x]  工作负载（优先级高，复用 Deployment/Pod 模式）
+        - [x]  StatefulSets (列表/详情)
+        - [x]  DaemonSets (列表/详情)
+        - [x]  Jobs & CronJobs (列表/详情)
+    - [x]  配置与存储
+        - [x]  ConfigMaps (详情显示 data，必要时折叠)
+        - [x]  Secrets (详情默认模糊，提供“显示”按钮)
+        - [x]  PersistentVolumeClaims & PersistentVolumes
+    - [x]  网络
+        - [x]  Ingresses (列表/详情)
+    - [x]  集群级/事件
+        - [x]  Nodes (列表/详情)
+        - [x]  Events 总览（可按 namespace / kind 过滤）
 - **阶段成果**: 一个功能完善的、覆盖了 SRE 日常 90% 常用资源的 K8s 只读 Dashboard，并拥有独特的 AI 诊断 Pod 的能力。
+- **退出标准**:
+  - `/connect` 工作流在本地与测试集群中稳定工作，连接失败场景有清晰提示。
+  - Pod 诊断 API 返回符合 Zod Schema 的结构化结果，并在 UI 中可视化呈现。
+  - 至少 10 种核心 K8s 资源具备“列表 + 详情 + 事件/YAML”三件套体验。
+  - 基础 UI 布局、导航、会话保护与 eslint/husky 校验全部上线并通过。
 ---
 
-## **Phase 2: 结构化写操作与风险控制 (Structured Write & Risk Control)**
+## **Phase 2: 安全写路径与模块化地基 (Safe Writes & Modular Foundations)**
 
-*目标：引入 `OperationPlan`，打通从“意图”到“安全执行”的核心写操作流程。这是我们 AI Native 理念的第一个闭环。*
+*目标：完成 OperationPlan 的最小可用闭环，同时为未来拆分和观测埋点奠定基础。*
 
-- [ ]  **命令面板 (Prompt Bar)**:
-    - [ ]  在 UI 顶部实现一个全局的命令/聊天输入框。
-    - [ ]  实现第一个意图识别：自然语言查询（例如 "show me all pods in kube-system"） -> 后端解析并返回资源列表。
-- [ ]  **OperationPlan 生成**:
-    - [ ]  在命令面板中支持简单的写操作意图（例如 "restart deployment my-app"）。
-    - [ ]  后端 API (`/api/ai/plan`) 接收意图，生成一个结构化的 `OperationPlan` JSON 对象。
-    - [ ]  **初期 `riskEngine` 可以非常简单：只使用确定性规则** (e.g., `delete` namespace -> high, `restart` deployment -> medium)。
-- [ ]  **操作确认 UI (PlanConfirmModal)**:
-    - [ ]  前端接收到 `OperationPlan` 对象后，弹出一个模态框。
-    - [ ]  清晰地展示：**你要做什么 (Action)**, **为什么这么做 (AI Rationale)**, **风险是什么 (Risk)**, **具体改变 (Diff)**。
-    - [ ]  提供“确认”和“取消”按钮。
-- [ ]  **安全执行与审计**:
-    - [ ]  用户点击“确认”后，前端调用 `/api/ai/execute` 并传递 `planId`。
-    - [ ]  后端从数据库中查找 Plan，再次校验，然后通过 K8s 安全代理执行操作。
-    - [ ]  **将整个 `OperationPlan` 的生命周期（从生成到执行）完整地记录在审计数据库中**。
-- **阶段成果**: 用户可以通过自然语言执行一个经过 AI 规划和风险评估、并由人类最终确认的安全写操作。我们验证了核心工作流。
+- [ ]  **UI 体验基线**  
+  - [ ]  打磨命令面板：支持快捷键（⌘K / Ctrl+K）、即时搜索结果、操作历史。  
+  - [ ]  PlanConfirmModal 视觉统一（分层 diff、风险徽标、回退提示），并保持移动端阅读友好。  
+  - [ ]  强化列表/详情导航，确保 OperationPlan 生成后可一键跳转至相关资源。
+
+- [ ]  **安全写路径 MVP**  
+  - [ ]  完成命令面板 MVP（自然语言 → 列表查询 → OperationPlan 生成入口）。  
+  - [ ]  后端提供 `/api/ai/plan` 与 `/api/ai/execute`，实现 `OperationPlan` 生成、持久化、审计写入。  
+  - [ ]  执行前校验 `resourceVersion`、`idempotencyKey`，失败时中止并回写错误。  
+  - [ ]  风险引擎初版：基于白名单 + 规则判定风险等级，写入审计。  
+  - [ ]  PlanConfirmModal 按三层可视化策略展示 diff 与风险，让用户确认/取消。
+
+- [ ]  **Prompt Registry 治理落地**  
+  - [ ]  在 `prompts/manifest` 中添加 `inputSchemaRef`、`outputSchemaRef`、`riskTier`、`rollout` 字段，并写入若干样例。  
+  - [ ]  编写验证脚本/CI，确保 Manifest 与 `src/lib/ai` schema 对齐。  
+  - [ ]  RiskAnnotator 根据 Prompt 元数据动态调整风险权重（高风险 Prompt 默认要求人工确认）。  
+  - [ ]  记录 `sourcePromptId` 到 OperationPlan 审计链，形成 prompt → plan → 执行闭环。
+
+- [ ]  **目录模块化 / Workspace 准备**  
+  - [ ]  引入 pnpm/turbo 工作区骨架，将 `src/lib/k8s/**`、`src/lib/ai/**` 迁入 `packages/domain-k8s` 与 `packages/domain-ai`。  
+  - [ ]  新建 `packages/infra-http` 提供 fetch/错误协议、`packages/ui-kit` 抽取共享 UI。  
+  - [ ]  配置 TS path alias + lint 规则，禁止跨包引用内部实现。  
+  - [ ]  在 `services/` 下创建 `core-api`、`ai-orchestrator` 占位（stub），确保 domain 包可直接复用。
+
+- [ ]  **可观测性与审计底座**  
+  - [ ]  收集 `/api/k8s/*`、`/api/ai/*` 请求日志、OperationPlan 状态流转，持久化到 Prisma。  
+  - [ ]  为 prompt 执行、plan 执行添加基础 metrics（成功率、失败原因分布）。  
+  - [ ]  提供最小的日志/metrics 导出能力（例如 OpenTelemetry stub），为后续 SLO 模块铺路。
+
+- **阶段成果**：用户可以安全地通过自然语言提交受控写操作；OperationPlan、Prompt Registry、审计、模块化边界全部落地，为 Phase 3 的智能化与服务化打下地基。
+- **退出标准**:
+  - 命令面板支持查询与至少一种写操作（如重启 Deployment），执行链路经过 PlanConfirmModal 审批。
+  - OperationPlan 以 `resourceVersion`/`idempotencyKey` 执行成功，审计记录完整，风险分级生效。
+  - Prompt Manifest 通过 CI 校验，发布流程遵循“草稿→灰度→上线”，风险等级与 Rollout 字段实际被消费。
+  - `packages/domain-*` 与 `packages/ui-kit` 等包完成拆分，lint 防护到位；`services/*` stub 可在 CI 构建。
+  - 核心 API/AI 路由的日志与基础指标（成功率、错误类型）可在监控面板中查看。
 
 ---
 
-## **Phase 3: 增强 AI 交互与扩展能力 (Enhanced AI Interaction & Capability)**
+## **Phase 3: 智能协作与服务化试点 (Intelligent Collaboration & Serviceification Pilot)**
 
-*目标：扩展支持的资源类型，并深化 AI 在开发工作流中的集成，使其更加智能和实用。*
+*目标：在安全基础上增强 AI 协作体验，同时验证单体拆分的可行性。*
 
-- [ ]  **YAML Copilot**:
-    - [ ]  集成 Monaco Editor，将所有资源详情页的只读 YAML 升级为可编辑。
-    - [ ]  在编辑器旁提供一个 AI 面板，可以对当前 YAML 进行“解释”、“检查最佳实践”、“生成修改建议”。
-    - [ ]  实现“应用”按钮，该操作同样会生成一个 `OperationPlan` 进入审查流程。
-- [ ]  **(增强) 任务：集成基础可观测性 (Integrate Foundational Observability)**:
-    - [ ]  目标: 引入 CPU、内存等核心指标，为 AI 诊断提供量化数据支撑，并为用户提供基础的性能概览。
-    - [ ]  前提: 假设用户的集群已安装 Prometheus (或兼容的 Metrics Server)。
-    - [ ]  任务 1: 后端集成:    
-        - [ ]  在后端引入 Prometheus API 客户端库。
-        - [ ]  创建新的 API 路由，如 /api/metrics/pod，用于根据 Pod 名称查询其 CPU/内存使用率。
-    - [ ]  任务 2: 前端可视化:
-        - [ ]  在 Pod 和 Node 的详情页，使用 Recharts 组件，添加展示 CPU 和内存使用历史曲线的图表。
-    - [ ]  任务 3: AI 上下文增强:
-        - [ ]  修改 /api/ai/diagnose/pod: 在调用 LLM 之前，先去获取该 Pod 近期的 CPU/内存指标。
-        - [ ]  将“Pod 当前 CPU 使用率为 95% (limit 100%)”这样的量化信息，注入到 Prompt 的上下文中。这将极大提升 AI 诊断的准确性（例如，它可以从 CrashLoopBackOff 推断出更具体的 OOMKilled）。
-- [ ]  **(增强) 任务：资源关系拓扑图 MVP (Resource Topology Graph MVP)**:
-    - [ ]  目标: 提供一个可视化的、上帝视角的集群资源关系图，帮助用户快速理解应用架构和故障影响范围。
-    - [ ]  技术选型: 前端使用 ReactFlow 或 vis.js 等图表库。
-    - [ ]  任务 1: 后端拓扑 API (/api/k8s/topology):
-        - [ ]  创建一个 API，用于获取指定 Namespace 下的核心资源 (Deployments, StatefulSets, Services, Pods, Ingresses)。
-        - [ ]  在后端分析资源间的关系：
-            - [ ]  通过 metadata.ownerReferences 找到 Deployment -> ReplicaSet -> Pod 的父子关系。
-            - [ ]  通过 spec.selector 找到 Service 指向哪些 Pods。
-            - [ ]  通过 Ingress rules 找到 Ingress 指向哪个 Service。
-        - [ ]  将这些资源和关系，构造成一个图数据结构（节点和边）返回给前端。
-    - [ ]  任务 2: 前端拓扑图实现:
-        - [ ]  创建一个新的页面 /dashboard/topology。
-        - [ ]  调用上述 API 获取数据，并使用 ReactFlow 将其渲染成一个可视化的拓扑图。
-    - [ ]  任务 3: MVP 交互:
-        - [ ]  允许用户拖拽、缩放画布。
-        - [ ]  点击图中的节点（例如一个 Pod），可以弹出一个包含其核心信息和状态的侧边栏。
-        - [ ]  点击图中的边（例如一个 Service -> Pod 的箭头），可以高亮显示相关资源。
-- **阶段成果**: KubeCopilot 进化为一个多感官的智能助手，它不仅能“读懂”YAML，还能“看到”性能指标和资源间的拓扑关系，其 AI 建议的深度和广度得到质的飞跃。  
+- [ ]  **UI 协作升级**  
+  - [ ]  资源详情页引入 AI 辅助侧栏（诊断、建议、回放），支持拖拽插入 Plan。  
+  - [ ]  YAML Copilot 采用分屏布局（编辑区 + AI 面板），支持提示、改写、预览对比。  
+  - [ ]  拓扑图提供交互式提示：节点悬浮信息卡、Plan 影响范围高亮、一步跳转到相关详情。
+
+- [ ]  **YAML Copilot + 多步骤 OperationPlan**  
+  - [ ]  集成 Monaco Editor + AI 面板，支持解释、Best Practice 检查、生成补丁。  
+  - [ ]  AI 建议落地为 `steps[]` 多步骤 OperationPlan，每步可附带 `rollbackPatch`。  
+  - [ ]  PlanConfirmModal 支持步骤查看、回滚策略提示，并记录执行前/后的 telemetry。
+
+- [ ]  **可观测性增强**  
+  - [ ]  集成 Prometheus / Metrics API，为 Pods/Nodes 提供 CPU、内存趋势，并注入诊断上下文。  
+  - [ ]  引入基础 tracing，标记 prompt → plan → execute 的延迟与失败点。  
+  - [ ]  仪表板展示 OperationPlan 成功率、案例库（典型 plan 与执行结果）。
+
+- [ ]  **服务化 PoC**  
+  - [ ]  将 AI Orchestrator 的核心逻辑抽离到 `services/ai-orchestrator`（Node/Edge 函数），前端通过 API 网关访问。  
+  - [ ]  `services/core-api` 提供统一的 K8s 访问代理，App Router 仅作为 BFF。  
+  - [ ]  Domain 包通过 npm workspace 共享，验证无痛迁移；补充部署脚本/说明。
+
+- [ ]  **资源拓扑 / AI 审阅协同**  
+  - [ ]  实现 `/api/k8s/topology`，前端用 ReactFlow 渲染拓扑图。  
+  - [ ]  AI 在生成 Plan 时引用拓扑上下文（判断受影响资源范围），PlanConfirmModal 可显示拓扑快照。
+
+- **阶段成果**：KubeCopilot 拥有多步 AI 协作能力与基础可观测性，模块边界得到验证，可逐步向真正的多服务架构演进。
+- **退出标准**:
+  - YAML Copilot 可生成多步骤 OperationPlan，并正确展示/执行 `steps[]` 与回滚策略。
+  - Prometheus 指标集成在 Pod/Node 详情页展示，同时注入 AI 诊断上下文。
+  - `services/ai-orchestrator` 或 `services/core-api` 至少有一个以独立进程/函数形态运行的 PoC，通过同一 domain 包编译。
+  - 拓扑图可交互查看资源关系，PlanConfirmModal 能关联显示影响范围。
+
 ---
 
-## **Phase 4: SRE 实践工具化 (SRE Practice Tooling)**
+## **Phase 4: SRE 工具化 & 渐进自动化 (SRE Tooling & Progressive Automation)**
 
-*目标：将 SRE 的核心实践工具化，让 KubeCopilot 成为真正的“SRE 驾驶舱”。*
+*目标：将可靠性工程实践嵌入日常操作，构建渐进式自动化闭环。*
 
-- [ ]  **[SRE 特性]** AI 在进行诊断时，会参考关联服务的**基础 SLI 指标**（如延迟、错误率），使其建议更贴近服务可靠性的核心目标。
-- [ ]  **SLO/错误预算管理模块**:
-    - [ ]  允许用户为 Service/Deployment 定义和追踪关键 SLI（可用性、延迟）。
-    - [ ]  可视化展示 SLO 目标和当前错误预算的消耗情况。
-    - [ ]  **风险引擎将集成错误预算作为决策因子**。
-- [ ]  **(增强) 任务：AI 辅助事后复盘 (AI-Assisted Postmortems)**:
-    - [ ]  提供一键生成复盘报告草稿的功能，自动聚合时间线、影响、日志和指标。(增强): AI 生成的复盘报告，将自动包含事件发生时相关 Pod/Node 的性能指标快照图表，以及一个受影响服务的拓扑关系截图，极大提升报告质量。
-- [ ]  **(增强) 任务：渐进式发布计划生成 (Progressive Rollout Plan Generation)**:
-    - [ ]  支持通过自然语言生成金丝雀发布、蓝绿部署的 OperationPlan 工作流。AI 生成的金丝雀发布计划，会包含一个“监控”步骤，该步骤将主动监控新版 Pod 的 CPU/内存使用率和 SLI 指标，并基于这些量化数据来建议是继续发布还是自动回滚。
+- [ ]  **UI 驾驶舱化**  
+  - [ ]  构建可靠性仪表盘：SLO 卡片、错误预算燃尽图、计划执行趋势。  
+  - [ ]  Postmortem Composer：拖拽证据块（事件、日志、拓扑快照、指标图），一键生成报告。  
+  - [ ]  发布控制面板：实时展示金丝雀进度、自动回滚状态，支持人工介入按钮。
+
+- [ ]  **SLO / 错误预算模块**  
+  - [ ]  支持为关键 Service 定义 SLI/SLO，接入现有 metrics 数据源。  
+  - [ ]  Risk Engine 引入 `sloBudgetImpact`，当错误预算告急自动提升风险等级。  
+  - [ ]  UI 展示每个 Plan 对错误预算的潜在影响。
+
+- [ ]  **AI 辅助事后复盘**  
+  - [ ]  聚合 OperationPlan、事件、指标生成 Postmortem 草稿，附带拓扑/指标快照。  
+  - [ ]  支持一键导出，并记录在审计库中。
+
+- [ ]  **渐进式发布与自动回滚**  
+  - [ ]  自然语言生成金丝雀/蓝绿 Plan，自动插入监控步骤。  
+  - [ ]  执行器能根据实时指标自动决定推进或回滚，并更新 Plan 状态。  
+  - [ ]  Prompt Registry 管理 rollout 阶段，支持灰度调度。
+
+- **阶段成果**：产品升级为“可靠性驾驶舱”，具备指标驱动的风险评估、AI 辅助复盘、渐进式发布能力，为最终的主动自动化做好准备。
+- **退出标准**:
+  - SLO/SLA 配置 UI 与后端落地，Risk Engine 能基于错误预算自动提升风险。
+  - Postmortem Composer 支持拖拽证据与一键生成报告，产出示例被 SRE 团队采用。
+  - 渐进式发布流程支持自动监控、暂停、回滚，并在 UI 中实时显示状态。
+  - Telemetry 与审计可以完整复盘一次计划的生成、审批、执行与后续影响。
+
 ---
 
-## **Phase 5 & Beyond: 迈向高级自动化与生态 (Towards Advanced Automation & Ecosystem)**
+## **Phase 5 & Beyond: 主动智能与生态扩展 (Proactive Intelligence & Ecosystem)**
 
-*目标：探索更主动的 AI 能力和更深度的集群集成，逐步实现“智能驾驶舱”的最终愿景。*
+*目标：探索主动式治理、生态集成与多集群管控，为商业化铺路。*
 
-- [ ]  **主动异常检测 (PoC)**: 后端 agent 定期巡检关键资源，发现异常（如 CrashLoopBackOff）时，自动生成一个 `status: pending` 的 `OperationPlan` 并通知用户审查。
-- [**未来**] **Admission Webhook (PoC)**: 探索将 `riskEngine` 的规则能力前置到 K8s 的准入控制层。
-- [**未来**] **插件系统**: 允许集成更多数据源（如 CloudWatch, GitOps 工具）和自定义操作。
-- [**未来**] **多集群管理与商业化**: 提供 Helm Chart/Docker 镜像部署，并探索多集群管理和商业支持模式。
-    [未来] 多集群管理与上下文切换 (Multi-Cluster Management & Context Switching)
-    愿景: 将 KubeCopilot 从单集群诊断工具提升为 SRE 和平台工程师的中央控制台，使其能够无缝管理和切换多个 Kubernetes 环境（如开发、预发布、生产）。
+- [ ]  **主动异常检测 Agent**：定时巡检关键资源，生成 `status: pending` 的 OperationPlan，推送给 SRE 审核。  
+- [ ]  **Admission Webhook PoC**：将风险规则前置至集群准入层，阻止未授权变更。  
+- [ ]  **插件生态**：开放 API 与插件机制，接入 CloudWatch/GitOps/服务台系统。  
+- [ ]  **多集群与商业化**：提供 Helm Chart/容器化部署、集群上下文切换、团队权限管理；探索企业版增值功能。
+  - UI 愿景：支持多角色主题（SRE/平台工程师）、集群上下文切换器、可插拔仪表组件，让团队在不 fork 核心 UI 的前提下扩展驾驶舱。  
+
+## **附录 A：术语表 (Glossary)**
+
+| 术语 | 定义 | 关联章节 |
+| --- | --- | --- |
+| OperationPlan | 描述一次写操作的结构化计划，包含 diff、风险、审计信息 | 第 8 节 |
+| PlanConfirmModal | 呈现 OperationPlan 的三层可视化确认 UI，支持人工批准 | 第 10 节 Phase 2 |
+| Prompt Registry | 管理 Prompt 模板、版本、灰度与风险信息的清单 | 第 9 节 |
+| Prompt Pipeline | AI 请求统一经过的五步流程：context → template → LLM → schema → risk | 第 9 节 |
+| Risk Engine / RiskAnnotator | 根据规则、SLO 和 Prompt 元数据为 OperationPlan 赋予风险等级 | 第 8、9 节 |
+| Secure Proxy | 负责持有集群凭证、统一访问 Kubernetes API 的后端组件 | 第 7 节 |
+| Domain Packages | `packages/domain-*` 中的领域逻辑包，供 apps/services 共享 | 第 6 节 |
+
+## **附录 B：常见问题 (FAQ)**
+
+**Q1：为什么写操作必须经过 OperationPlan？**  
+A：它提供可审计、可回滚的契约，能在执行前校验资源版本并呈现风险。如果不经过 Plan，AI 写操作会缺乏追踪与安全保证。
+
+**Q2：Prompt Registry 更新流程复杂吗？**  
+A：更新需通过 PR + CI 校验 + 指定审核人检查，随后按 `rollout` 灰度发布。这样可以避免高风险 Prompt 直接影响生产。
+
+**Q3：如果 LLM 输出不符合 Schema 怎么办？**  
+A：Zod 校验失败时触发 fallback：重试、替换为保守 Prompt，或将请求标记为人工处理，确保不执行不确定的计划。
+
+**Q4：未来拆分微服务会很难吗？**  
+A：Phase 2 完成包化与 `services/*` stub 后，前端与后端通过明确 API 合同交互，迁移时只需替换部署目标，无需重写领域代码。
+
+**Q5：如何快速在 UI 中验证新特性？**  
+A：使用命令面板+PlanConfirmModal 的组合；若是可视化增强，遵循 UI 迭代策略，仅替换视图层并复用 hooks/state。
+
+---
     核心特性:
         安全凭证存储: 允许用户连接并安全地存储多个集群的凭证。Kubeconfig 将被加密后存储在数据库中，并与用户账户关联。
         连接命名: 用户可以为每个连接指定一个易于识别的名称（例如，prod-us-east-1, staging-eu-west, dev-cluster）。

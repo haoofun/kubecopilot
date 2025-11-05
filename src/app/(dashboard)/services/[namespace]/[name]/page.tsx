@@ -1,105 +1,87 @@
-'use client'
-
-import { useK8sResource } from '@/hooks/useK8sResource'
-import { V1Service, CoreV1Event } from '@kubernetes/client-node'
-import { ServiceInfoCard } from '@/components/k8s/ServiceInfoCard'
-import { Skeleton } from '@/components/ui/skeleton'
-import { EventsTable } from '@/components/k8s/EventsTable'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { ServiceInfoCard } from '@/components/k8s/services/ServiceInfoCard'
+import { ServiceEndpointsCard } from '@/components/k8s/services/ServiceEndpointsCard'
+import { EventsTable } from '@/components/k8s/shared/EventsTable'
+import { ReadOnlyYamlViewer } from '@/components/k8s/shared/ReadOnlyYamlViewer'
+import { ResourceDetailPage } from '@/components/k8s/shared/ResourceDetailPage'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { ReadOnlyYamlViewer } from '@/components/shared/ReadOnlyYamlViewer'
-import { use } from 'react'
-import { Alert, AlertDescription } from '@/components/ui/alert'
+import { parseK8sError } from '@/lib/api/error'
+import { getServiceDetail } from '@/lib/k8s/services/service.service'
+import { notFound, redirect } from 'next/navigation'
 
-interface ServiceDetailData {
-  detail: V1Service
-  events: CoreV1Event[]
-  yaml: string
-}
-type Params = Promise<{ namespace: string; name: string }>
-
-export default function ServiceDetailPage({ params }: { params: Params }) {
-  const { namespace, name } = use(params)
-  const { data, isLoading, isError } = useK8sResource<ServiceDetailData>(
-    `services/${namespace}/${name}`,
-  )
-
-  if (isLoading) {
-    return <DetailSkeleton /> // 使用一个通用的骨架屏
-  }
-
-  if (isError) {
-    return (
-      <Alert variant="destructive">
-        <AlertDescription>
-          {isError?.message || 'Failed to load service details.'}
-        </AlertDescription>
-      </Alert>
-    )
-  }
-  return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Service: {name}</h1>
-        <p className="text-muted-foreground">Namespace: {namespace}</p>
-      </div>
-
-      <Tabs defaultValue="overview">
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="events">Events</TabsTrigger>
-          <TabsTrigger value="yaml">YAML</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="overview" className="mt-4 space-y-6">
-          <ServiceInfoCard service={data?.detail} />
-          {/* TODO: Add a card for Endpoints related to this service */}
-        </TabsContent>
-
-        <TabsContent value="events" className="mt-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Events</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <EventsTable events={data?.events} />
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="yaml" className="mt-4">
-          <ReadOnlyYamlViewer yamlString={data?.yaml || ''} />
-        </TabsContent>
-      </Tabs>
-    </div>
-  )
+type PageProps = {
+  params: Promise<{ name: string; namespace: string }>
 }
 
-// 通用骨架屏
-function DetailSkeleton() {
+export default async function Page({ params }: PageProps) {
+  const { name, namespace } = await params
+
+  let detail: Awaited<ReturnType<typeof getServiceDetail>> | null = null
+  let error: ReturnType<typeof parseK8sError> | null = null
+
+  try {
+    detail = await getServiceDetail(namespace, name, {
+      includeEndpoints: true,
+      includeRaw: true,
+      includeYaml: true,
+    })
+  } catch (err) {
+    const apiError = parseK8sError(err)
+    if (apiError.statusCode === 404) {
+      notFound()
+    }
+    error = apiError
+  }
+
+  if (error?.statusCode === 401) {
+    redirect('/connect')
+  }
+
   return (
-    <div className="space-y-6">
-      <div>
-        <Skeleton className="mb-2 h-8 w-1/2" />
-        <Skeleton className="h-4 w-1/4" />
-      </div>
-      <Card>
-        <CardHeader>
-          <Skeleton className="h-6 w-1/3" />
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <Skeleton className="h-4 w-full" />
-          <Skeleton className="h-4 w-full" />
-        </CardContent>
-      </Card>
-      <Card>
-        <CardHeader>
-          <Skeleton className="h-6 w-1/4" />
-        </CardHeader>
-        <CardContent>
-          <Skeleton className="h-32 w-full" />
-        </CardContent>
-      </Card>
-    </div>
+    <ResourceDetailPage
+      resourceBase="services"
+      name={name}
+      namespace={namespace}
+      detail={detail}
+      error={error}
+      InfoCardComponent={ServiceInfoCard}
+      breadcrumbs={[
+        { label: 'Home', href: '/' },
+        { label: 'Services', href: '/services' },
+        { label: namespace, href: `/services?namespace=${namespace}` },
+      ]}
+    >
+      {(detail) => (
+        <div className="space-y-6">
+          <Tabs defaultValue="endpoints" className="mt-4">
+            <TabsList className="grid w-full grid-cols-3 sm:w-auto">
+              <TabsTrigger value="endpoints">Endpoints</TabsTrigger>
+              <TabsTrigger value="events">Events</TabsTrigger>
+              <TabsTrigger value="yaml">YAML</TabsTrigger>
+            </TabsList>
+            <TabsContent value="endpoints" className="pt-4">
+              <div className="h-[32rem] overflow-auto pr-1">
+                <ServiceEndpointsCard summary={detail.summary} />
+              </div>
+            </TabsContent>
+            <TabsContent value="events" className="pt-4">
+              <div className="h-[32rem] overflow-auto pr-1">
+                <EventsTable
+                  resourceBase="services"
+                  namespace={namespace}
+                  name={name}
+                  uid={detail.summary.uid}
+                  kind="Service"
+                />
+              </div>
+            </TabsContent>
+            <TabsContent value="yaml" className="pt-4">
+              <div className="h-[32rem] overflow-auto pr-1">
+                <ReadOnlyYamlViewer yaml={detail.yaml} raw={detail.raw} />
+              </div>
+            </TabsContent>
+          </Tabs>
+        </div>
+      )}
+    </ResourceDetailPage>
   )
 }

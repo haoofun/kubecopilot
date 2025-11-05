@@ -1,107 +1,71 @@
-'use client'
-
-import { useK8sResource } from '@/hooks/useK8sResource'
-import { V1Namespace, CoreV1Event } from '@kubernetes/client-node'
-import { NamespaceInfoCard } from '@/components/k8s/NamespaceInfoCard'
-import { Skeleton } from '@/components/ui/skeleton'
-import { EventsTable } from '@/components/k8s/EventsTable'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { NamespaceInfoCard } from '@/components/k8s/namespaces/NamespaceInfoCard'
+import { NamespaceInsights } from '@/components/k8s/namespaces/NamespaceInsights'
+import { ReadOnlyYamlViewer } from '@/components/k8s/shared/ReadOnlyYamlViewer'
+import { ResourceDetailPage } from '@/components/k8s/shared/ResourceDetailPage'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { ReadOnlyYamlViewer } from '@/components/shared/ReadOnlyYamlViewer'
-import { use } from 'react'
-import { Alert, AlertDescription } from '@/components/ui/alert'
+import { parseK8sError } from '@/lib/api/error'
+import { getNamespaceDetail } from '@/lib/k8s/services/namespace.service'
+import { notFound, redirect } from 'next/navigation'
 
-interface NamespaceDetailData {
-  detail: V1Namespace
-  events: CoreV1Event[]
-  yaml: string
-}
-type Params = Promise<{ name: string }>
-
-export default function NamespaceDetailPage({ params }: { params: Params }) {
-  const { name } = use(params)
-  const { data, isLoading, isError } = useK8sResource<NamespaceDetailData>(
-    `namespaces/${name}`,
-  )
-
-  if (isLoading) {
-    return <DetailSkeleton /> // 使用一个通用的骨架屏
-  }
-
-  if (isError) {
-    return (
-      <Alert variant="destructive">
-        <AlertDescription>
-          {isError?.message || 'Failed to load namespace details.'}
-        </AlertDescription>
-      </Alert>
-    )
-  }
-  return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Namespace: {name}</h1>
-        <p className="text-muted-foreground">
-          Status: {data?.detail.status?.phase}
-        </p>
-      </div>
-
-      <Tabs defaultValue="overview">
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="events">Events</TabsTrigger>
-          <TabsTrigger value="yaml">YAML</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="overview" className="mt-4 space-y-6">
-          <NamespaceInfoCard namespace={data?.detail} />
-          {/* TODO: Add a card for Endpoints related to this namespace */}
-        </TabsContent>
-
-        <TabsContent value="events" className="mt-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Events</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <EventsTable events={data?.events} />
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="yaml" className="mt-4">
-          <ReadOnlyYamlViewer yamlString={data?.yaml || ''} />
-        </TabsContent>
-      </Tabs>
-    </div>
-  )
+type PageProps = {
+  params: Promise<{ name: string }>
 }
 
-// 通用骨架屏
-function DetailSkeleton() {
+export default async function Page({ params }: PageProps) {
+  const { name } = await params
+
+  let detail: Awaited<ReturnType<typeof getNamespaceDetail>> | null = null
+  let error: ReturnType<typeof parseK8sError> | null = null
+
+  try {
+    detail = await getNamespaceDetail(name, {
+      includeRaw: true,
+      includeYaml: true,
+    })
+  } catch (err) {
+    const apiError = parseK8sError(err)
+    if (apiError.statusCode === 404) {
+      notFound()
+    }
+    error = apiError
+  }
+
+  if (error?.statusCode === 401) {
+    redirect('/connect')
+  }
+
   return (
-    <div className="space-y-6">
-      <div>
-        <Skeleton className="mb-2 h-8 w-1/2" />
-        <Skeleton className="h-4 w-1/4" />
-      </div>
-      <Card>
-        <CardHeader>
-          <Skeleton className="h-6 w-1/3" />
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <Skeleton className="h-4 w-full" />
-          <Skeleton className="h-4 w-full" />
-        </CardContent>
-      </Card>
-      <Card>
-        <CardHeader>
-          <Skeleton className="h-6 w-1/4" />
-        </CardHeader>
-        <CardContent>
-          <Skeleton className="h-32 w-full" />
-        </CardContent>
-      </Card>
-    </div>
+    <ResourceDetailPage
+      resourceBase="namespaces"
+      name={name}
+      detail={detail}
+      error={error}
+      InfoCardComponent={NamespaceInfoCard}
+      breadcrumbs={[
+        { label: 'Home', href: '/' },
+        { label: 'Namespaces', href: '/namespaces' },
+      ]}
+    >
+      {(detail) => (
+        <div className="space-y-6">
+          <Tabs defaultValue="insights" className="mt-4">
+            <TabsList className="grid w-full grid-cols-2 sm:w-auto">
+              <TabsTrigger value="insights">Insights</TabsTrigger>
+              <TabsTrigger value="yaml">YAML</TabsTrigger>
+            </TabsList>
+            <TabsContent value="insights" className="pt-4">
+              <div className="h-[32rem] overflow-auto pr-1">
+                <NamespaceInsights summary={detail.summary} />
+              </div>
+            </TabsContent>
+            <TabsContent value="yaml" className="pt-4">
+              <div className="h-[32rem] overflow-auto pr-1">
+                <ReadOnlyYamlViewer yaml={detail.yaml} raw={detail.raw} />
+              </div>
+            </TabsContent>
+          </Tabs>
+        </div>
+      )}
+    </ResourceDetailPage>
   )
 }

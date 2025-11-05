@@ -1,22 +1,24 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
+import { SESSION_COOKIE_NAME } from '@/lib/session'
+
 // 这个函数将会在匹配的路径上，于页面渲染前执行
 export function middleware(request: NextRequest) {
   // 1. 从请求中获取会话 Cookie
-  const sessionIdCookie = request.cookies.get('k8s-session-id')
+  const sessionCookie = request.cookies.get(SESSION_COOKIE_NAME)
   const { pathname } = request.nextUrl
 
   // 2. 认证保护逻辑
   // 如果用户尝试访问除 /connect 之外的任何受保护页面，但没有会话 Cookie
-  if (pathname !== '/connect' && !sessionIdCookie) {
+  if (pathname !== '/connect' && !sessionCookie) {
     // 将他们重定向到连接页面
     return NextResponse.redirect(new URL('/connect', request.url))
   }
 
   // 3. 防止已连接用户再次访问连接页面
   // 如果用户已经有会话 Cookie，但又访问了 /connect 页面
-  if (pathname === '/connect' && sessionIdCookie) {
+  if (pathname === '/connect' && sessionCookie) {
     // 将他们重定向到仪表盘主页
     return NextResponse.redirect(new URL('/', request.url))
   }

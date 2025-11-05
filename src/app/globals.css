@@ -116,7 +116,16 @@
   * {
     @apply border-border outline-ring/50;
   }
+  html {
+    overflow-y: scroll;
+    scrollbar-gutter: stable both-edges;
+  }
+  .h-\[32rem\].overflow-auto,
+  .max-h-\[32rem\].overflow-auto {
+    scrollbar-gutter: stable both-edges;
+  }
   body {
+    scrollbar-gutter: stable both-edges;
     @apply bg-background text-foreground;
   }
 }

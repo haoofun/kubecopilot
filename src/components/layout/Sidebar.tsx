@@ -2,8 +2,25 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { cn } from '@/lib/utils' // shadcn/ui's utility for conditional classes
-import { Home, Box, Server, Network } from 'lucide-react' // Icons
+import { cn } from '@/lib/utils'
+import {
+  Home,
+  Box,
+  Server,
+  Layers3,
+  Settings,
+  ListChecks,
+  AlarmClock,
+  FileText,
+  Lock,
+  HardDrive,
+  Database,
+  CalendarDays,
+  ServerCog,
+  RouteIcon,
+  Network,
+  ServerCrash,
+} from 'lucide-react'
 
 export function Sidebar() {
   const pathname = usePathname()
@@ -12,8 +29,19 @@ export function Sidebar() {
     { href: '/', label: 'Overview', icon: Home },
     { href: '/pods', label: 'Pods', icon: Box },
     { href: '/deployments', label: 'Deployments', icon: Server },
+    { href: '/statefulsets', label: 'StatefulSets', icon: Layers3 },
+    { href: '/daemonsets', label: 'DaemonSets', icon: Settings },
+    { href: '/jobs', label: 'Jobs', icon: ListChecks },
+    { href: '/cronjobs', label: 'CronJobs', icon: AlarmClock },
+    { href: '/configmaps', label: 'ConfigMaps', icon: FileText },
+    { href: '/secrets', label: 'Secrets', icon: Lock },
+    { href: '/pvcs', label: 'PVCs', icon: HardDrive },
+    { href: '/pvs', label: 'PVs', icon: Database },
+    { href: '/ingresses', label: 'Ingresses', icon: RouteIcon },
+    { href: '/events', label: 'Events', icon: CalendarDays },
+    { href: '/nodes', label: 'Nodes', icon: ServerCog },
     { href: '/services', label: 'Services', icon: Network },
-    { href: '/namespaces', label: 'Namespaces', icon: Box },
+    { href: '/namespaces', label: 'Namespaces', icon: ServerCrash },
   ]
 
   return (
@@ -21,8 +49,7 @@ export function Sidebar() {
       <div className="flex h-full max-h-screen flex-col gap-2">
         <div className="flex h-14 items-center border-b px-4 lg:h-[60px] lg:px-6">
           <Link href="/" className="flex items-center gap-2 font-semibold">
-            {/* You can add an SVG logo here later */}
-            <span className="">KubeCopilot</span>
+            <span>KubeCopilot</span>
           </Link>
         </div>
         <div className="flex-1">

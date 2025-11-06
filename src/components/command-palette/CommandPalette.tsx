@@ -27,6 +27,8 @@ import { cn } from '@/lib/utils'
 import type { GlobalSearchResult } from '@/lib/k8s/types/search'
 import { operationPlanFixtures } from '@/lib/operation-plan/mock-data'
 import { describeOperation } from '@/components/operation-plan/utils'
+import type { OperationPlan } from '@/lib/operation-plan/types'
+import { PlanConfirmModal } from '@/components/plan-confirm-modal'
 
 interface CommandHistoryEntry {
   uid: string
@@ -108,6 +110,11 @@ export function CommandPalette() {
   const [results, setResults] = useState<GlobalSearchResult[]>([])
   const [history, setHistory] = useState<CommandHistoryEntry[]>([])
   const [activeIndex, setActiveIndex] = useState(0)
+  const [activePlan, setActivePlan] = useState<OperationPlan | null>(null)
+  const [isPlanModalOpen, setIsPlanModalOpen] = useState(false)
+  const [isGeneratingPlan, setIsGeneratingPlan] = useState(false)
+  const [isExecutingPlan, setIsExecutingPlan] = useState(false)
+  const [isDismissingPlan, setIsDismissingPlan] = useState(false)
 
   const planShortcuts = useMemo(() => buildPlanShortcuts(), [])
 
@@ -266,8 +273,86 @@ export function CommandPalette() {
     }
   }, [activeIndex, flatItems])
 
+  const handlePlanShortcut = useCallback(
+    async (item: PaletteItem) => {
+      if (isGeneratingPlan) {
+        return
+      }
+
+      const templateId = item.uid.startsWith('plan:')
+        ? item.uid.replace('plan:', '')
+        : item.uid
+      const template = operationPlanFixtures.find(
+        (plan) => plan.id === templateId,
+      )
+
+      if (!template) {
+        setError('Plan template unavailable. Please try another action.')
+        return
+      }
+
+      setIsGeneratingPlan(true)
+      try {
+        const response = await fetch('/api/ai/plan', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: template.action,
+            intent: template.intent,
+            aiRationale: template.aiRationale,
+            requestedBy: template.audit.requestedBy,
+            resource: template.resource,
+            diff: template.diff,
+            steps: template.steps,
+            idempotencyKey: `${template.audit.idempotencyKey ?? template.id}-${Date.now()}`,
+            sourcePromptId: template.audit.sourcePromptId ?? undefined,
+            version: template.version,
+          }),
+        })
+
+        if (!response.ok) {
+          const payload = await response.json().catch(() => null)
+          const message =
+            typeof payload?.error?.message === 'string'
+              ? payload.error.message
+              : `Plan generation failed with status ${response.status}`
+          setError(message)
+          return
+        }
+
+        const payload = (await response.json()) as {
+          success: true
+          data: { plan: OperationPlan }
+        }
+
+        setActivePlan(payload.data.plan)
+        setIsPlanModalOpen(true)
+        setIsOpen(false)
+        setQuery('')
+        setSearchValue('')
+        setResults([])
+        setError(null)
+        setActiveIndex(0)
+      } catch (fetchError) {
+        setError(
+          fetchError instanceof Error
+            ? fetchError.message
+            : 'Unexpected error while generating plan',
+        )
+      } finally {
+        setIsGeneratingPlan(false)
+      }
+    },
+    [isGeneratingPlan, setError],
+  )
+
   const handleNavigate = useCallback(
     (item: PaletteItem) => {
+      if (item.source === 'plan') {
+        void handlePlanShortcut(item)
+        return
+      }
+
       router.push(item.href)
       setIsOpen(false)
       setQuery('')
@@ -292,8 +377,64 @@ export function CommandPalette() {
         return next
       })
     },
-    [router],
+    [handlePlanShortcut, router],
   )
+
+  const handlePlanApprove = useCallback(async (plan: OperationPlan) => {
+    setIsExecutingPlan(true)
+    try {
+      const response = await fetch('/api/ai/execute', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          planId: plan.id,
+          actor: 'user:command-palette',
+          resourceVersion: plan.resource.resourceVersion,
+          idempotencyKey: plan.audit.idempotencyKey,
+        }),
+      })
+
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null)
+        const message =
+          typeof payload?.error?.message === 'string'
+            ? payload.error.message
+            : `Execution failed with status ${response.status}`
+        setError(message)
+        return
+      }
+
+      const payload = (await response.json()) as {
+        success: true
+        data: { plan: OperationPlan }
+      }
+
+      setActivePlan(payload.data.plan)
+    } finally {
+      setIsExecutingPlan(false)
+    }
+  }, [])
+
+  const handlePlanReject = useCallback(async () => {
+    if (!activePlan) {
+      return
+    }
+
+    try {
+      setIsDismissingPlan(true)
+      await fetch('/api/ai/plan', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          planId: activePlan.id,
+          actor: 'user:command-palette',
+        }),
+      })
+    } finally {
+      setIsDismissingPlan(false)
+      setActivePlan(null)
+    }
+  }, [activePlan])
 
   const hint = useMemo(() => {
     if (query.trim().length > 0 && query.trim().length < MIN_QUERY_LENGTH) {
@@ -416,6 +557,12 @@ export function CommandPalette() {
                             type="button"
                             onMouseEnter={() => setActiveIndex(flattenedIndex)}
                             onClick={() => handleNavigate(item)}
+                            disabled={
+                              item.source === 'plan' &&
+                              (isGeneratingPlan ||
+                                isExecutingPlan ||
+                                isDismissingPlan)
+                            }
                             className={cn(
                               'w-full rounded-xl border px-3 py-3 text-left transition-colors',
                               isActive
@@ -466,6 +613,22 @@ export function CommandPalette() {
           </div>
         </div>
       ) : null}
+      <PlanConfirmModal
+        plan={activePlan}
+        open={isPlanModalOpen && Boolean(activePlan)}
+        onOpenChange={(next) => {
+          setIsPlanModalOpen(next)
+          if (!next) {
+            setActivePlan(null)
+          }
+        }}
+        onApprove={handlePlanApprove}
+        onReject={async () => {
+          await handlePlanReject()
+        }}
+        isApproving={isExecutingPlan}
+        isRejecting={isDismissingPlan}
+      />
     </>
   )
 }

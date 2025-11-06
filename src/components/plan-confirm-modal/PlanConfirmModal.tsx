@@ -23,6 +23,8 @@ export interface PlanConfirmModalProps {
   onOpenChange: (next: boolean) => void
   onApprove?: (plan: OperationPlan) => Promise<void> | void
   onReject?: (plan: OperationPlan) => Promise<void> | void
+  isApproving?: boolean
+  isRejecting?: boolean
 }
 
 export function PlanConfirmModal({
@@ -31,9 +33,10 @@ export function PlanConfirmModal({
   onOpenChange,
   onApprove,
   onReject,
+  isApproving = false,
+  isRejecting = false,
 }: PlanConfirmModalProps) {
   const confirmButtonRef = useRef<HTMLButtonElement | null>(null)
-  const isLoading = false
 
   const handleClose = useCallback(() => onOpenChange(false), [onOpenChange])
 
@@ -395,6 +398,7 @@ export function PlanConfirmModal({
             {onReject ? (
               <Button
                 variant="outline"
+                disabled={isApproving || isRejecting}
                 onClick={async () => {
                   if (onReject) {
                     await onReject(plan)
@@ -403,6 +407,9 @@ export function PlanConfirmModal({
                 }}
                 className="sm:min-w-[140px]"
               >
+                {isRejecting ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden />
+                ) : null}
                 Reject
               </Button>
             ) : (
@@ -417,7 +424,7 @@ export function PlanConfirmModal({
             <Button
               ref={confirmButtonRef}
               className="sm:min-w-[180px]"
-              disabled={isLoading}
+              disabled={isApproving}
               onClick={async () => {
                 if (onApprove) {
                   await onApprove(plan)
@@ -425,7 +432,7 @@ export function PlanConfirmModal({
                 handleClose()
               }}
             >
-              {isLoading ? (
+              {isApproving ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden />
               ) : (
                 <Check className="mr-2 h-4 w-4" aria-hidden />

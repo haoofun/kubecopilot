@@ -1,8 +1,8 @@
 'use client'
 
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle } from '@ui-kit/card'
 import { InfoRow } from '@/components/shared/InfoRow'
-import type { PVDetail } from '@/lib/k8s/types/pv'
+import type { PVDetail } from '@domain-k8s/types/pv'
 import { useStableTimestamp } from '@/hooks/useStableTimestamp'
 
 const renderKeyValueChips = (data?: Record<string, string>) => {

@@ -4,7 +4,7 @@ import { useTransition, type ComponentProps } from 'react'
 import { useRouter } from 'next/navigation'
 import { RefreshCw } from 'lucide-react'
 
-import { Button } from '@/components/ui/button'
+import { Button } from '@ui-kit/button'
 
 type ResourceRefreshButtonProps = Omit<ComponentProps<typeof Button>, 'onClick'>
 

@@ -1,8 +1,33 @@
+<!-- OPENSPEC:START -->
+# OpenSpec Instructions
+
+These instructions are for AI assistants working in this project.
+
+Always open `@/openspec/AGENTS.md` when the request:
+- Mentions planning or proposals (words like proposal, spec, change, plan)
+- Introduces new capabilities, breaking changes, architecture shifts, or big performance/security work
+- Sounds ambiguous and you need the authoritative spec before coding
+
+Use `@/openspec/AGENTS.md` to learn:
+- How to create and apply change proposals
+- Spec format and conventions
+- Project structure and guidelines
+
+Keep this managed block so 'openspec update' can refresh the instructions.
+
+<!-- OPENSPEC:END -->
+
 # Repository Guidelines
 
 ## Project Structure & Module Organization
+- The application's UI is organized into five main sections reflecting different user workflows:
+  - **AI Copilot**: Centralizes AI-powered tools like `Ask the Cluster` (`/ask-cluster`), `YAML Copilot` (`/yaml-copilot`), and `Operation Plans` (`/operation-plans`).
+  - **Mission Control**: Provides an SRE-focused dashboard for troubleshooting. It includes views for `Health` (`/ai-diagnosis`), `App Runtime` (e.g., `/pods`, `/deployments`), and `Platform` resources.
+  - **Dashboards**: Offers high-level visual dashboards for cluster, workload, network, and storage status under `/dashboards/*`.
+  - **Resources**: Acts as a traditional Kubernetes resource browser, providing detailed views for all resource types (e.g., `/pods`, `/deployments`, `/services`).
+  - **Audit**: Contains logs for operations, API calls, and events under `/audit/*`.
 - App Router lives in `src/app`; screens sit under `(dashboard)` and REST proxies under `api/k8s/*`.
-- Shared UI stays in `src/components`, hooks in `src/hooks`, and Kubernetes helpers in `src/lib/k8s`.
+- Shared UI now lives in `packages/ui-kit`, hooks stay in `src/hooks`, and Kubernetes helpers reside in `packages/domain-k8s` behind the `@domain-k8s/*` alias.
 - Database models live in `prisma/schema.prisma`; the generated client in `src/generated/prisma` must remain untouched.
 - Assets sit in `public/`, global styles in `src/app/globals.css`, and architectural decisions in `SSOT.md`.
 

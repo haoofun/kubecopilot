@@ -1,8 +1,8 @@
 'use client'
 
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle } from '@ui-kit/card'
 import { InfoRow } from '@/components/shared/InfoRow'
-import type { PVCDetail } from '@/lib/k8s/types/pvc'
+import type { PVCDetail } from '@domain-k8s/types/pvc'
 import { useStableTimestamp } from '@/hooks/useStableTimestamp'
 
 interface PVCInfoCardProps {

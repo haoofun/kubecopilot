@@ -2,7 +2,7 @@ import React from 'react'
 import Link from 'next/link'
 import { ArrowLeft, Terminal } from 'lucide-react'
 
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import { Alert, AlertDescription, AlertTitle } from '@ui-kit/alert'
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -10,10 +10,10 @@ import {
   BreadcrumbList,
   BreadcrumbPage,
   BreadcrumbSeparator,
-} from '@/components/ui/breadcrumb'
-import { Button } from '@/components/ui/button'
+} from '@ui-kit/breadcrumb'
+import { Button } from '@ui-kit/button'
 import { ResourceRefreshButton } from './ResourceRefreshButton'
-import type { DetailResponse } from '@/lib/k8s/types/common'
+import type { DetailResponse } from '@domain-k8s/types/common'
 
 type BreadcrumbEntry = { label: string; href: string }
 

@@ -3,7 +3,7 @@
 import { ResourceTable, ColumnDef } from '@/components/k8s/shared/ResourceTable'
 import { useK8sResourceList } from '@/hooks/useK8sResource'
 import { formatRelativeTime } from '@/lib/formatters/time'
-import type { DaemonSetSummary } from '@/lib/k8s/types/daemonset'
+import type { DaemonSetSummary } from '@domain-k8s/types/daemonset'
 
 interface DaemonSetRow {
   name: string

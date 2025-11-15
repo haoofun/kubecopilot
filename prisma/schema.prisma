@@ -1,9 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
   provider = "prisma-client-js"
   output   = "../src/generated/prisma"
@@ -12,4 +6,80 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+}
+
+model OperationPlan {
+  id                  String              @id
+  version             String
+  status              String
+  action              String
+  intent              String
+  aiRationale         String
+  resourceKind        String
+  resourceNamespace   String
+  resourceName        String
+  resourceUid         String?
+  resourceVersion     String?
+  resourceCluster     String?
+  resourceHref        String
+  diffBefore          Json?
+  diffPatch           Json
+  diffPatchFormat     String
+  diffRollbackPatch   Json?
+  riskLevel           String
+  riskRationale       String
+  riskScore           Float?
+  riskFactors         Json
+  riskSloBudgetImpact String?
+  riskPostConditions  Json
+  requestedBy         String
+  confirmedBy         String?
+  executedBy          String?
+  idempotencyKey      String?
+  sourcePromptId      String?
+  createdAt           DateTime            @default(now())
+  confirmedAt         DateTime?
+  executedAt          DateTime?
+  failedAt            DateTime?
+  revertedAt          DateTime?
+  audits              AuditEvent[]
+  steps               OperationPlanStep[]
+}
+
+model OperationPlanStep {
+  id            String        @id
+  planId        String
+  stepOrder     Int
+  action        String
+  description   String
+  patch         Json?
+  rollbackPatch Json?
+  plan          OperationPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+}
+
+model AuditEvent {
+  id        String         @id @default(cuid())
+  planId    String?
+  type      String
+  actor     String
+  metadata  Json?
+  createdAt DateTime       @default(now())
+  plan      OperationPlan? @relation(fields: [planId], references: [id], onDelete: Cascade)
+}
+
+model ApiRequestLog {
+  id         String             @id @default(cuid())
+  route      String
+  method     String
+  statusCode Int
+  durationMs Int?
+  category   ApiRequestCategory
+  actor      String?
+  metadata   Json?
+  createdAt  DateTime           @default(now())
+}
+
+enum ApiRequestCategory {
+  K8S
+  AI
 }

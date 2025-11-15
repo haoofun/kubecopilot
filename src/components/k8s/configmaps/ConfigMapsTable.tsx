@@ -3,7 +3,7 @@
 import { ResourceTable, ColumnDef } from '@/components/k8s/shared/ResourceTable'
 import { useK8sResourceList } from '@/hooks/useK8sResource'
 import { formatRelativeTime } from '@/lib/formatters/time'
-import type { ConfigMapSummary } from '@/lib/k8s/types/configmap'
+import type { ConfigMapSummary } from '@domain-k8s/types/configmap'
 
 interface ConfigMapRow {
   name: string

@@ -19,7 +19,11 @@
       }
     ],
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@domain-ai/*": ["./packages/domain-ai/src/*"],
+      "@domain-k8s/*": ["./packages/domain-k8s/src/*"],
+      "@infra-http/*": ["./packages/infra-http/src/*"],
+      "@ui-kit/*": ["./packages/ui-kit/src/*"]
     }
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],

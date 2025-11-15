@@ -1,8 +1,8 @@
 'use client'
 
-import { Badge } from '@/components/ui/badge'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import type { DeploymentDetail } from '@/lib/k8s/types/deployment'
+import { Badge } from '@ui-kit/badge'
+import { Card, CardContent, CardHeader, CardTitle } from '@ui-kit/card'
+import type { DeploymentDetail } from '@domain-k8s/types/deployment'
 
 interface DeploymentPodsCardProps {
   summary: DeploymentDetail

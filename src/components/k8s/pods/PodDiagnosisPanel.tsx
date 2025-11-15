@@ -3,11 +3,11 @@
 import { useState } from 'react'
 import { Loader2, Stethoscope, Wand2 } from 'lucide-react'
 
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import type { PodDiagnosis } from '@/lib/ai/schemas/diagnosis'
+import { Alert, AlertDescription, AlertTitle } from '@ui-kit/alert'
+import { Badge } from '@ui-kit/badge'
+import { Button } from '@ui-kit/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@ui-kit/card'
+import type { PodDiagnosis } from '@domain-ai/schemas/diagnosis'
 
 interface PodDiagnosisPanelProps {
   namespace: string

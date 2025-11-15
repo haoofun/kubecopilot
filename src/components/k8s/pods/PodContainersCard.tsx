@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle } from '@ui-kit/card'
 import {
   Table,
   TableBody,
@@ -10,9 +10,9 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table'
-import { Badge } from '@/components/ui/badge'
-import type { PodDetail } from '@/lib/k8s/types/pod'
+} from '@ui-kit/table'
+import { Badge } from '@ui-kit/badge'
+import type { PodDetail } from '@domain-k8s/types/pod'
 
 interface PodContainersCardProps {
   pod: PodDetail

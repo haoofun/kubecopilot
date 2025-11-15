@@ -4,10 +4,10 @@ import { useState } from 'react'
 
 import { ResourceTable, ColumnDef } from '@/components/k8s/shared/ResourceTable'
 import { useK8sResourceList } from '@/hooks/useK8sResource'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
+import { Badge } from '@ui-kit/badge'
+import { Button } from '@ui-kit/button'
 import { formatRelativeTime } from '@/lib/formatters/time'
-import type { PodSummary } from '@/lib/k8s/types/pod'
+import type { PodSummary } from '@domain-k8s/types/pod'
 
 interface PodRow {
   name: string

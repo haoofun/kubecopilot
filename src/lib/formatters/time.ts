@@ -1,5 +1,8 @@
 import { formatDistanceToNow } from 'date-fns'
 
+/**
+ * Converts Kubernetes timestamps into human-friendly relative strings (e.g., "5m ago") for tables and cards.
+ */
 export function formatRelativeTime(
   value?: string | null,
   options?: Parameters<typeof formatDistanceToNow>[1],

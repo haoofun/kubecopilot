@@ -4,8 +4,8 @@ import { useCallback, useEffect, useMemo, useRef } from 'react'
 import Link from 'next/link'
 import { ArrowUpRight, Check, Loader2, X } from 'lucide-react'
 
-import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
+import { Button } from '@ui-kit/button'
+import { Badge } from '@ui-kit/badge'
 import { cn } from '@/lib/utils'
 import type { OperationPlan } from '@/lib/operation-plan/types'
 import {

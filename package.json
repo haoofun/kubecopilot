@@ -2,13 +2,18 @@
   "name": "kubecopilot",
   "version": "0.1.0",
   "private": true,
+  "workspaces": [
+    "packages/*",
+    "services/*"
+  ],
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
     "prepare": "husky",
-    "postinstall": "patch-package"
+    "postinstall": "patch-package",
+    "validate:prompts": "node scripts/validate-prompts.mjs"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",

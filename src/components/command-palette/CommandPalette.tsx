@@ -20,11 +20,11 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Badge } from '@/components/ui/badge'
+import { Button } from '@ui-kit/button'
+import { Input } from '@ui-kit/input'
+import { Badge } from '@ui-kit/badge'
 import { cn } from '@/lib/utils'
-import type { GlobalSearchResult } from '@/lib/k8s/types/search'
+import type { GlobalSearchResult } from '@domain-k8s/types/search'
 import { operationPlanFixtures } from '@/lib/operation-plan/mock-data'
 import { describeOperation } from '@/components/operation-plan/utils'
 import type { OperationPlan } from '@/lib/operation-plan/types'

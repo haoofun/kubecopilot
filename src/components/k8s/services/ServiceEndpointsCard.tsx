@@ -1,7 +1,7 @@
 'use client'
 
-import { Badge } from '@/components/ui/badge'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Badge } from '@ui-kit/badge'
+import { Card, CardContent, CardHeader, CardTitle } from '@ui-kit/card'
 import {
   Table,
   TableBody,
@@ -9,8 +9,8 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table'
-import type { ServiceDetail } from '@/lib/k8s/types/service'
+} from '@ui-kit/table'
+import type { ServiceDetail } from '@domain-k8s/types/service'
 
 interface ServiceEndpointsCardProps {
   summary: ServiceDetail

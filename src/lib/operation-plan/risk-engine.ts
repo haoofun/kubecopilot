@@ -6,6 +6,7 @@ import type {
   OperationPlanStep,
 } from './types'
 
+/** Normalized payload containing all plan inputs needed to calculate a risk score. */
 interface RiskEvaluationContext {
   action: OperationPlanAction
   namespace: string
@@ -33,6 +34,7 @@ const actionLabel: Record<OperationPlanAction, string> = {
   restart: 'rolling restart',
 }
 
+/** Heuristics that attach factor labels and adjust the baseline risk score. */
 function detectRiskFactors(context: RiskEvaluationContext) {
   const factors: string[] = []
   let scoreDelta = 0
@@ -111,6 +113,10 @@ function deriveSloImpact(
   }
 }
 
+/**
+ * Calculates a risk object that the observability board displays beside AI-generated plans, blending action baselines
+ * with heuristics about namespaces, kinds, replica changes, image rollouts, and rollback availability.
+ */
 export function evaluatePlanRisk(
   context: RiskEvaluationContext,
 ): OperationPlanRisk {

@@ -2,11 +2,11 @@
 
 import useSWR from 'swr'
 
-import { Card, CardContent } from '@/components/ui/card'
-import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Card, CardContent } from '@ui-kit/card'
+import { Alert, AlertDescription } from '@ui-kit/alert'
 import { formatRelativeTime } from '@/lib/formatters/time'
-import type { K8sEvent } from '@/lib/k8s/types/event'
-import type { ListResponse } from '@/lib/k8s/types/common'
+import type { K8sEvent } from '@domain-k8s/types/event'
+import type { ListResponse } from '@domain-k8s/types/common'
 
 interface GlobalEventsTableProps {
   namespace?: string

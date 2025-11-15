@@ -1,7 +1,7 @@
 'use client'
 
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import type { NamespaceDetail } from '@/lib/k8s/types/namespace'
+import { Card, CardContent, CardHeader, CardTitle } from '@ui-kit/card'
+import type { NamespaceDetail } from '@domain-k8s/types/namespace'
 
 interface NamespaceInsightsProps {
   summary: NamespaceDetail

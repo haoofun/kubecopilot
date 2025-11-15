@@ -3,7 +3,7 @@
 import { ResourceTable, ColumnDef } from '@/components/k8s/shared/ResourceTable'
 import { useK8sResourceList } from '@/hooks/useK8sResource'
 import { formatRelativeTime } from '@/lib/formatters/time'
-import type { JobSummary } from '@/lib/k8s/types/job'
+import type { JobSummary } from '@domain-k8s/types/job'
 
 interface JobRow {
   name: string

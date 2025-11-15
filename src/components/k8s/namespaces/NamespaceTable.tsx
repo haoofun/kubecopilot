@@ -3,7 +3,7 @@
 import { ResourceTable, ColumnDef } from '@/components/k8s/shared/ResourceTable'
 import { useK8sResourceList } from '@/hooks/useK8sResource'
 import { formatRelativeTime } from '@/lib/formatters/time'
-import type { NamespaceSummary } from '@/lib/k8s/types/namespace'
+import type { NamespaceSummary } from '@domain-k8s/types/namespace'
 
 interface NamespaceRow {
   name: string

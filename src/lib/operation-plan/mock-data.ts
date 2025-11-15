@@ -1,5 +1,6 @@
 import type { OperationPlan } from './types'
 
+/** Fixture plans used in Storybook/tests to demo how AI-suggested changes render inside the observability UI. */
 export const operationPlanFixtures: OperationPlan[] = [
   {
     id: '8f4f3b3d-1c0d-4f0c-9f6f-2d0c4c0b5c1a',

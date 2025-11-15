@@ -1,0 +1,211 @@
+// lib/api/error.ts
+
+/**
+ * 自定义 API 错误类，为可观测性看板的后端请求提供统一的错误形态与 HTTP 状态码。
+ */
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    public statusCode: number = 500,
+    public code?: string,
+    public details?: unknown,
+  ) {
+    super(message)
+    this.name = 'ApiError'
+  }
+}
+
+/**
+ * K8s 特定错误，附带 Kubernetes 状态码与 reason，便于看板在 UI 中映射原生错误。
+ */
+export class K8sError extends ApiError {
+  constructor(
+    message: string,
+    public k8sStatusCode?: number,
+    public k8sReason?: string,
+  ) {
+    super(message, 500, 'K8S_ERROR')
+    this.name = 'K8sError'
+  }
+}
+
+/**
+ * 验证错误，提示看板用户输入的参数与 Kubernetes 预期不匹配。
+ */
+export class ValidationError extends ApiError {
+  constructor(
+    message: string,
+    public fields?: Record<string, string>,
+  ) {
+    super(message, 400, 'VALIDATION_ERROR', fields)
+    this.name = 'ValidationError'
+  }
+}
+
+/**
+ * 资源未找到错误，常用于映射 Kubernetes 404，以便在看板展示 “Pod 不存在” 等提示。
+ */
+export class NotFoundError extends ApiError {
+  constructor(resource: string, identifier?: string) {
+    const message = identifier
+      ? `${resource} '${identifier}' not found`
+      : `${resource} not found`
+    super(message, 404, 'NOT_FOUND')
+    this.name = 'NotFoundError'
+  }
+}
+
+/**
+ * 权限错误，用于将 Kubernetes 403/ RBAC 拒绝信息反馈给看板。
+ */
+export class ForbiddenError extends ApiError {
+  constructor(message: string = 'Access forbidden') {
+    super(message, 403, 'FORBIDDEN')
+    this.name = 'ForbiddenError'
+  }
+}
+
+/**
+ * 未授权错误，提醒用户重新连接集群或刷新认证信息。
+ */
+export class UnauthorizedError extends ApiError {
+  constructor(message: string = 'Unauthorized') {
+    super(message, 401, 'UNAUTHORIZED')
+    this.name = 'UnauthorizedError'
+  }
+}
+
+type K8sStatusDetails = {
+  /** kind 表示出错的资源类型，映射 Kubernetes Status.details.kind，供看板显示“Pod”或“Deployment”。 */
+  kind?: string
+  /** name 表示资源名称，帮助用户知道哪一个 K8s 对象失败。 */
+  name?: string
+}
+
+type K8sStatusBody = {
+  /** message 是 Kubernetes 返回的详细错误文本。 */
+  message?: string
+  /** reason 对应 Kubernetes 状态 reason，供看板筛选错误类别。 */
+  reason?: string
+  /** details 包含资源元数据，用于构造链接或提示。 */
+  details?: K8sStatusDetails
+}
+
+type MaybeK8sError = {
+  /** response.body/statusCode 映射 HTTP 层面的 K8s 错误响应。 */
+  response?: {
+    body?: K8sStatusBody
+    statusCode?: number
+  }
+  /** body/statusCode 兼容部分 SDK 直接在顶层返回 Status。 */
+  body?: K8sStatusBody
+  statusCode?: number
+  /** code/message 捕获 Node.js network 错误，帮助看板提示连接异常。 */
+  code?: string
+  message?: string
+}
+
+function isObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null
+}
+
+/**
+ * 从 K8s 客户端错误转换为 ApiError，以便可观测性看板在前端统一处理状态码与错误原因。
+ */
+export function parseK8sError(error: unknown): ApiError {
+  if (error instanceof ApiError) {
+    return error
+  }
+
+  if (isObject(error)) {
+    const candidate = error as MaybeK8sError
+
+    if (candidate.response?.body) {
+      const body = candidate.response.body
+      const statusCode = candidate.response.statusCode ?? 500
+      const message = body.message ?? body.reason ?? 'K8s API error'
+      const k8sReason = body.reason
+
+      switch (statusCode) {
+        case 404:
+          return new NotFoundError(
+            body.details?.kind || 'Resource',
+            body.details?.name,
+          )
+        case 403:
+          return new ForbiddenError(message)
+        case 401:
+          return new UnauthorizedError(message)
+        case 409:
+          return new ApiError(message, 409, 'CONFLICT')
+        case 422:
+          return new ValidationError(message)
+        default:
+          return new K8sError(message, statusCode, k8sReason)
+      }
+    }
+
+    if (candidate.body) {
+      return parseK8sError({
+        response: {
+          body: candidate.body,
+          statusCode: candidate.statusCode,
+        },
+      })
+    }
+
+    const networkCode = candidate.code
+    if (networkCode === 'ECONNREFUSED') {
+      return new ApiError(
+        'Cannot connect to Kubernetes API server',
+        503,
+        'CONNECTION_REFUSED',
+      )
+    }
+
+    if (networkCode === 'ETIMEDOUT') {
+      return new ApiError('Kubernetes API request timeout', 504, 'TIMEOUT')
+    }
+
+    if (typeof candidate.message === 'string') {
+      return new ApiError(candidate.message)
+    }
+  }
+
+  if (error instanceof Error) {
+    return new ApiError(error.message)
+  }
+
+  return new ApiError('Internal server error', 500, 'INTERNAL_ERROR')
+}
+
+/**
+ * 错误日志辅助函数，在服务端记录带时间戳的错误，以便追踪看板/API 与 Kubernetes 通信问题。
+ */
+export function logError(error: unknown, context?: string) {
+  const timestamp = new Date().toISOString()
+  const prefix = context ? `[${context}]` : ''
+
+  const details: Record<string, unknown> = {}
+
+  if (error instanceof ApiError) {
+    details.name = error.name
+    details.message = error.message
+    details.statusCode = error.statusCode
+    details.code = error.code
+    details.details = error.details
+    if (process.env.NODE_ENV === 'development') {
+      details.stack = error.stack
+    }
+  } else if (error instanceof Error) {
+    details.name = error.name
+    details.message = error.message
+    if (process.env.NODE_ENV === 'development') {
+      details.stack = error.stack
+    }
+  } else {
+    details.value = error
+  }
+
+  console.error(`${timestamp} ${prefix} Error:`, details)
+}

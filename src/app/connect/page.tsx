@@ -2,7 +2,7 @@
 
 import { useRef, useState } from 'react'
 import { useRouter } from 'next/navigation' // 导入 useRouter
-import { Button } from '@/components/ui/button'
+import { Button } from '@ui-kit/button'
 import {
   Card,
   CardContent,
@@ -10,10 +10,10 @@ import {
   CardFooter,
   CardHeader,
   CardTitle,
-} from '@/components/ui/card'
-import { Label } from '@/components/ui/label'
-import { Textarea } from '@/components/ui/textarea'
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert' // 导入 Alert
+} from '@ui-kit/card'
+import { Label } from '@ui-kit/label'
+import { Textarea } from '@ui-kit/textarea'
+import { Alert, AlertDescription, AlertTitle } from '@ui-kit/alert' // 导入 Alert
 
 // 建议也安装一下 lucide-react 用于图标
 import { Terminal } from 'lucide-react'

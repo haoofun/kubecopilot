@@ -2,8 +2,8 @@
 
 import { useEffect, useMemo, useState } from 'react'
 
-import { Alert, AlertDescription } from '@/components/ui/alert'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Alert, AlertDescription } from '@ui-kit/alert'
+import { Card, CardContent, CardHeader, CardTitle } from '@ui-kit/card'
 import {
   Table,
   TableBody,
@@ -11,11 +11,11 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table'
+} from '@ui-kit/table'
 import { useK8sResourceList } from '@/hooks/useK8sResource'
 import { formatRelativeTime } from '@/lib/formatters/time'
-import type { QueryParams } from '@/lib/k8s/types/common'
-import type { K8sEvent } from '@/lib/k8s/types/event'
+import type { QueryParams } from '@domain-k8s/types/common'
+import type { K8sEvent } from '@domain-k8s/types/event'
 
 interface EventsTableProps {
   resourceBase: string

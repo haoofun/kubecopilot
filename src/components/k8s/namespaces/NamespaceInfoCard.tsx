@@ -1,8 +1,8 @@
 'use client'
 
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle } from '@ui-kit/card'
 import { InfoRow } from '@/components/shared/InfoRow'
-import type { NamespaceDetail } from '@/lib/k8s/types/namespace'
+import type { NamespaceDetail } from '@domain-k8s/types/namespace'
 import { useStableTimestamp } from '@/hooks/useStableTimestamp'
 
 interface NamespaceInfoCardProps {

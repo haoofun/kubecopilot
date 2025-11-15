@@ -2,7 +2,7 @@
 
 import { ShieldAlert, ShieldCheck, ShieldHalf } from 'lucide-react'
 
-import { Badge } from '@/components/ui/badge'
+import { Badge } from '@ui-kit/badge'
 import { cn } from '@/lib/utils'
 import type { OperationPlanRiskLevel } from '@/lib/operation-plan/types'
 

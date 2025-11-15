@@ -9,6 +9,10 @@ declare global {
   var __sessionStore: Map<string, string> | undefined
 }
 
+/**
+ * In-memory store that holds kubeconfigs per session so all server-side API routes can authenticate to Kubernetes
+ * on behalf of the signed-in observability user.
+ */
 const sessionStore: Map<string, string> =
   globalThis.__sessionStore ?? new Map<string, string>()
 
@@ -16,6 +20,7 @@ if (!globalThis.__sessionStore) {
   globalThis.__sessionStore = sessionStore
 }
 
+/** Cookie used to tie browser requests back to the in-memory kubeconfig session. */
 export const SESSION_COOKIE_NAME = 'kubecopilot.session'
 
 export interface SessionData {

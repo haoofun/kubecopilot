@@ -216,24 +216,27 @@ kubecopilot/
 │   ├── core-api/                  # K8s 读写、会话、权限；可迁移到独立 Node/Go 服务
 │   ├── ai-orchestrator/           # Prompt registry、LLM pipeline、评估任务
 │   └── audit-ledger/              # OperationPlan、审计日志、事件回放
-├── packages/                      # 可被 apps/services 复用的领域包（支持 pnpm/npm workspace）
-│   ├── domain-k8s/                # Kubernetes DTO、用例、策略；当前 `src/lib/k8s/**`
-│   ├── domain-ai/                 # Prompt schema、AI 风险模型；当前 `src/lib/ai/**`
-│   ├── infra-http/                # fetch/node-fetch 封装、错误协议；当前 `src/lib/api/**`
-│   ├── ui-kit/                    # 设计体系组件；当前 `src/components/**`
-│   └── telemetry/                 # 监控、审计、日志统一 SDK（待引入）
+├── packages/                      # 可被 apps/services 复用的领域包（支持 npm workspace）
+│   ├── domain-k8s/                # Kubernetes DTO、用例、策略；已从 `src/lib/k8s/**` 迁入
+│   ├── domain-ai/                 # Prompt schema、AI 风险模型；已从 `src/lib/ai/**` 迁入
+│   ├── infra-http/                # fetch/node-fetch 封装、错误协议；已从 `src/lib/api/**` 迁入
+│   ├── ui-kit/                    # 设计体系组件；已从 `src/components/ui/**` 迁入
+│   └── telemetry/                 # 监控、审计、日志统一 SDK（待建设）
 ├── prisma/                        # 数据访问层；迁移时可被 core-api 重用
 ├── prompts/                       # Prompt Registry（版本化资源）
 ├── patches/                       # 对第三方依赖的 patch-package (确保 deterministic build)
-├── tools/                         # 脚本、代码生成、评估工具（未来补充）
+├── scripts/                       # 本地脚本（如 prompt manifest 校验）
+├── src/lib/operation-plan         # Risk Engine、Plan 服务、审计持久化
+├── src/lib/prisma.ts              # Prisma client 单例
+├── src/lib/telemetry              # API 请求日志包装器等观测辅助
 ├── SSOT.md / README.md            # 架构 & 团队对齐文档
 └── package.json / pnpm-workspace.yaml (未来) / turbo.json (未来)
 ```
 
 **演进路径**
 
-1. **Phase A（当前）**：保留 `apps/console` 单体形态，持续在 `packages/` 思维下划分目录（即便物理仍在 `src/lib/**`，也要遵循包边界约束：禁止“跨领域”导入内部实现）。
-2. **Phase B（边界固化）**：引入工作区（pnpm workspace 或 turborepo），把 `src/lib/k8s/*`、`src/lib/ai/*` 等迁入 `packages/`，并通过 barrel export + lint 限制交叉引用；在 `services/` 下创建占位（stub）服务，复用同一套 domain 包。
+1. **Phase A（已完成）**：保留 `apps/console` 单体形态，持续在 `packages/` 思维下划分目录（即便物理仍在 `src/lib/**`，也要遵循包边界约束：禁止“跨领域”导入内部实现）。
+2. **Phase B（边界固化，进行中）**：已经引入 npm workspace，并把 `src/lib/k8s/*`、`src/lib/ai/*` 等迁入 `packages/`；同时在 `services/` 下创建占位（stub）服务，复用同一套 domain 包，后续将补齐 lint/CI 守护与 barrel export。
 3. **Phase C（服务化拆分）**：当某一领域需要独立扩容或安全隔离（如 `ai-orchestrator` 访问外部 LLM），将其迁到独立部署单元，只需替换 `apps/console` 中的 API 网关地址，domain 包和 DTO 保持不变，实现“无痛拆分”。
 
 通过上述规划，团队可以在保持交付速度的同时，逐步获得清晰的领域界限、可组合的包，以及天然支持微服务/多运行时的架构骨架。
@@ -243,11 +246,11 @@ kubecopilot/
 
 - `src/app/(dashboard)`：按资源域划分页面（pods/deployments/...）；App Router 的服务器组件负责拉取数据并拼装 UI，`layout.tsx` 统一壳层，`events/` 页面提供全局事件时间线。
 - `src/app/api`：  
-  - `api/k8s/**/[[...path]]/route.ts` 为各资源提供统一入口（列表、详情、events、搜索），路由层只解析参数，业务交由 `lib/k8s/services`。  
-  - `api/ai/diagnose` 等目录承载 AI 调用代理，复用 `lib/ai` 的 prompt pipeline。  
+  - `api/k8s/**/[[...path]]/route.ts` 为各资源提供统一入口（列表、详情、events、搜索），路由层只解析参数，业务交由 `packages/domain-k8s`。  
+  - `api/ai/diagnose` 等目录承载 AI 调用代理，复用 `packages/domain-ai` 的 prompt pipeline。  
   - `api/k8s/search` 提供跨资源搜索/聚合。
 - `src/components/k8s`：以资源为单位拆分 UI 组件，`shared/` 下的 `EventsTable.tsx`、`ReadOnlyYamlViewer.tsx`、`ResourceDetailPage.tsx`、`ResourceTable.tsx` 提供一致的详情体验；`k8s/**` 内的卡片、表格消费 typed DTO。
-- `src/components/ui` & `src/components/layout`：封装 UI 基础组件（基于 shadcn/ui）与全局导航、搜索栏等布局元素。
+- `packages/ui-kit` & `src/components/layout`：封装 UI 基础组件（基于 shadcn/ui）与全局导航、搜索栏等布局元素。
 - `src/hooks/useK8sResource.ts`：集中处理 SWR 数据流、轮询、状态管理，为 Dashboard 页面提供统一的数据获取体验。
 - `src/lib`：  
   - `lib/k8s/services` / `transformers` / `types` / `utils`：Kubernetes 领域逻辑；`connection.ts` 与 `client.ts` 负责 kubeconfig、API client 生命周期。  
@@ -257,6 +260,80 @@ kubecopilot/
 - `prisma/`：数据模型定义；`src/generated/prisma` 为自动生成的 Prisma Client（只读）。
 - `prompts/`：LLM 提示语模板与 manifest；`patches/` 存放 `patch-package` 生成的依赖补丁，保证构建一致性。
 - 其他：`AGENTS.md` / `GEMINI.md` 等说明文档，`eslint.config.mjs` / `postcss.config.mjs` / `tailwind` 配置支撑工程化标准。
+
+### **6.2.1 导航架构 V1 (Navigation Architecture V1)**
+
+V1 版本的导航结构反映了项目早期的功能布局，主要以 AI 功能和扁平化的资源列表为核心。
+
+- **Operations (操作)**
+  - `Operation Plans`: 查看和管理由 AI 生成或用户创建的操作计划。
+  - `YAML Copilot`: 使用 AI 辅助编写和审查 Kubernetes YAML 配置。
+- **Observability (可观测性)**
+  - `Overview`: 集群的全局概览。
+  - `Pods`: 查看 Pods 列表。
+  - `Deployments`: 查看 Deployments 列表。
+  - `StatefulSets`: 查看 StatefulSets 列表。
+  - `DaemonSets`: 查看 DaemonSets 列表。
+  - `Jobs`: 查看 Jobs 列表。
+  - `CronJobs`: 查看 CronJobs 列表。
+  - `ConfigMaps`: 查看 ConfigMaps 列表。
+  - `Secrets`: 查看 Secrets 列表。
+  - `PVCs`: 查看 PersistentVolumeClaims 列表。
+  - `PVs`: 查看 PersistentVolumes 列表。
+  - `Ingresses`: 查看 Ingresses 列表。
+  - `Events`: 查看集群事件。
+  - `Nodes`: 查看集群节点列表。
+  - `Services`: 查看 Services 列表。
+  - `Namespaces`: 查看 Namespaces 列表。
+
+### **6.2.2 导航架构 V2 (Navigation Architecture V2)**
+
+V2 是面向 SRE 排障闭环的 IA，核心目标是：AI 能力置顶、导航顺序贴合真实 troubleshooting path，同时保留传统资源树作为辅助工具。该结构通过 `NEXT_PUBLIC_ENABLE_NAV_V2` feature flag 控制：生产默认为 `false`（V1），本地开发可在 `.env.local` 中设置 `NEXT_PUBLIC_ENABLE_NAV_V2=true` 体验 V2。需要回退/切换时，只需调整同名环境变量并重新启动 Next.js。
+
+- **AI Copilot（助理驾驶舱）**
+  - *定位*: 所有“以 AI 交互为中心”的工作流集中在这里，用户进入时的心智是“我来让 AI 帮我做事”，而非浏览资源。
+  - *典型能力*: `Ask the Cluster`（自然语言问诊）、`YAML Copilot`（生成/校验 YAML）、`Operation Plans`（AI 生成操作方案）。
+  - *体验特征*: 入口是输入框/表单/向导，主要输出结构化的 AI 结论（分析-计划-建议），可跨 namespace/资源串联上下文，强调人机协作（AI 提案 + 人审阅执行）。
+  - *不做*: 不承担完整资源浏览、图表展示，这些交给 Resources 与 Dashboards。
+- **SRE Mission Control（排障任务流）**
+  - *定位*: 给 Oncall/SRE 排障用的“驾驶舱”，核心问题是“哪里不健康？我要怎么排查？”，而不是 CRUD UI。
+  - *分组*: `Health`（总览、Events、AI Diagnosis）、`App Runtime`（Pods/Deployments/...）、`Platform`（ConfigMaps/Secrets/...）、`Infra`（Nodes/Namespaces）。
+  - *体验特征*: 资源按异常优先级排序，支持按“过去 30 分钟重启 >3 次”这类聚合，配 AI 解释/建议。
+  - *不做*: 不追求字段完整性，不做资源级 CRUD；那是 Resources 的职责。
+- **Dashboards（仪表盘）**
+  - *定位*: “读数 + 趋势 + TopN” 的可视化态势视图，回答“整体情况如何”。
+  - *典型页面*: `Overview`、`Node/Workload/Network/Storage Dashboard`，以卡片/图表展示资源健康、延迟、流量、容量趋势，可跳入 Mission Control/Resources 深挖。
+  - *不做*: 不提供精细操作或完整 Detail，纯只读。
+- **Resources（K8s 工具箱）** — 三级树结构，覆盖所有既有资源：
+  - *定位*: 对标 `kubectl get/describe` 的“中立、完整”资源浏览器，为专业用户提供全部字段/YAML/Events。
+  - `Workloads` → Pods / Deployments / StatefulSets / DaemonSets / Jobs / CronJobs
+  - `Networking` → Services / Ingresses
+  - `Config & Storage` → ConfigMaps / Secrets / PVCs / PVs
+  - `Cluster` → Nodes / Namespaces
+  - *体验特征*: `/resources/<kind>` 采用优化的两栏布局：桌面端左列是带工具栏的表格（过滤器收敛到 toolbar、列表在限定高度内滚动），右列为可折叠/可调整宽度的 Inspector（内容用响应式卡片网格 + 粘性 tabs 呈现 Summary/Spec/Status/Events/YAML）；移动端 Inspector 以 Drawer + Accordion 呈现，避免过长滚动。
+  - *区别*: 与 Mission Control 的“问题优先”不同，这里是“资源优先”。
+- **Audit（审计 & 操作记录）**
+  - *定位*: 记录“谁在什么时候、为何对集群做了什么”，是 AI+人类运维行为的账本。
+  - `Operation History` (`/audit/operations`)：展示每条 Operation Plan 的生成/执行/结果。
+  - `Audit Events` (`/audit/events`)：关键操作事件（删除资源、扩缩容等）。
+  - `API Logs` (`/audit/api-logs`)：后端调用 K8s API 的日志。
+  - *字段*: `time`、`actor`、`action`、`resources affected`、`source`（来自 AI/Mission Control/手工）、`status`、`reason/comment`。
+  - *体验特征*: 时间线/表格视图，强调过滤、审计、追责，不提供直接操作。
+
+> **占位路由策略**
+> 
+> 为避免导航链接 404，所有 V2 新增入口都必须先创建 Next.js 页面（返回 `<div>🚧 Coming Soon</div>`）。对应目录：
+> - `src/app/ask-cluster/page.tsx`
+> - `src/app/ai-diagnosis/page.tsx`
+> - `src/app/dashboards/{cluster,workloads,network,storage}/page.tsx`
+> - `src/app/audit/{operations,api-logs,events}/page.tsx`
+>
+> 后续实现功能时直接替换页面内容，无需改导航配置。
+
+> **未来扩展**
+> 
+> Network Policies、Storage Classes、CRDs 等仍在规划中，只在 SSOT 中记录，不在 V2 UI 中出现，以免产生“功能不可用 / 权限被禁”误解。发布相应页面后再追加到 `navConfigV2`.
+
 
 
 # **7. 核心架构 (Core Architecture)**
@@ -570,6 +647,7 @@ contextBuilder → promptLoader → LLM call → ZodValidator → RiskAnnotator
   - `evaluationMetrics` 与 `rollout` 字段使我们可以记录离线测评结果、逐步扩大覆盖面，并结合 `envAllowlist` 控制不同环境的启用策略。  
   - `owner`、`reviewedBy`、`changelog` 构成完整的 Prompt 审批链；任何改动必须通过 Registry 提交，执行器基于 `riskTier` 与 `model` 选择对应的安全策略。  
   - RiskAnnotator 可依据 `riskTier`、最近指标自动调高人类审核阈值，例如高风险 Prompt 默认要求 OperationPlan 再经过人工确认。
+  - `npm run validate:prompts` 校验清单，执行 Zod 模式与模板文件存在性检查，为 CI 提供快速守门。
 
 > **发布流程**
 >
@@ -666,36 +744,36 @@ contextBuilder → promptLoader → LLM call → ZodValidator → RiskAnnotator
 
 *目标：完成 OperationPlan 的最小可用闭环，同时为未来拆分和观测埋点奠定基础。*
 
-- [ ]  **UI 体验基线**  
-  - [ ]  打磨命令面板：支持快捷键（⌘K / Ctrl+K）、即时搜索结果、操作历史。  
-  - [ ]  PlanConfirmModal 视觉统一（分层 diff、风险徽标、回退提示），并保持移动端阅读友好。  
-  - [ ]  强化列表/详情导航，确保 OperationPlan 生成后可一键跳转至相关资源。
+- [x]  **UI 体验基线**  
+  - [x]  打磨命令面板：支持快捷键（⌘K / Ctrl+K）、即时搜索结果、操作历史。  
+  - [x]  PlanConfirmModal 视觉统一（分层 diff、风险徽标、回退提示），并保持移动端阅读友好。  
+  - [x]  强化列表/详情导航，确保 OperationPlan 生成后可一键跳转至相关资源。
 
 - [ ]  **安全写路径 MVP**  
-  - [ ]  完成命令面板 MVP（自然语言 → 列表查询 → OperationPlan 生成入口）。  
-  - [ ]  后端提供 `/api/ai/plan` 与 `/api/ai/execute`，实现 `OperationPlan` 生成、持久化、审计写入。  
-  - [ ]  执行前校验 `resourceVersion`、`idempotencyKey`，失败时中止并回写错误。  
-  - [ ]  风险引擎初版：基于白名单 + 规则判定风险等级，写入审计。  
-  - [ ]  PlanConfirmModal 按三层可视化策略展示 diff 与风险，让用户确认/取消。
+  - [x]  完成命令面板 MVP（自然语言 → 列表查询 → OperationPlan 生成入口，当前以命令模板/fixtures 驱动）。  
+  - [x]  后端提供 `/api/ai/plan` 与 `/api/ai/execute`，实现 `OperationPlan` 生成、持久化、审计写入（当前以内存存储 + 控制台审计记录实现，待接入 Prisma 持久层）。  
+  - [x]  执行前校验 `resourceVersion`、`idempotencyKey`，失败时中止并回写错误。  
+  - [x]  风险引擎初版：基于白名单 + 规则判定风险等级，写入审计。  
+  - [x]  PlanConfirmModal 按三层可视化策略展示 diff 与风险，让用户确认/取消。
 
 - [ ]  **Prompt Registry 治理落地**  
-  - [ ]  在 `prompts/manifest` 中添加 `inputSchemaRef`、`outputSchemaRef`、`riskTier`、`rollout` 字段，并写入若干样例。  
-  - [ ]  编写验证脚本/CI，确保 Manifest 与 `src/lib/ai` schema 对齐。  
-  - [ ]  RiskAnnotator 根据 Prompt 元数据动态调整风险权重（高风险 Prompt 默认要求人工确认）。  
-  - [ ]  记录 `sourcePromptId` 到 OperationPlan 审计链，形成 prompt → plan → 执行闭环。
+  - [x]  在 `prompts/manifest` 中添加 `inputSchemaRef`、`outputSchemaRef`、`riskTier`、`rollout` 字段，并写入若干样例（当前覆盖 `diagnose-pod`，后续拓展其余 Prompt）。  
+- [x]  编写验证脚本/CI，确保 Manifest 与 `packages/domain-ai` schema 对齐（`npm run validate:prompts` 校验文件存在与 Zod 契约）。  
+  - [x]  RiskAnnotator 根据 Prompt 元数据动态调整风险权重（`riskTier` 会抬高最低风险等级、分值与审批提示）。  
+  - [x]  记录 `sourcePromptId` 到 OperationPlan 审计链，形成 prompt → plan → 执行闭环。
 
-- [ ]  **目录模块化 / Workspace 准备**  
-  - [ ]  引入 pnpm/turbo 工作区骨架，将 `src/lib/k8s/**`、`src/lib/ai/**` 迁入 `packages/domain-k8s` 与 `packages/domain-ai`。  
-  - [ ]  新建 `packages/infra-http` 提供 fetch/错误协议、`packages/ui-kit` 抽取共享 UI。  
-  - [ ]  配置 TS path alias + lint 规则，禁止跨包引用内部实现。  
-  - [ ]  在 `services/` 下创建 `core-api`、`ai-orchestrator` 占位（stub），确保 domain 包可直接复用。
+- [x]  **目录模块化 / Workspace 准备**  
+  - [x]  引入 npm workspace 骨架，将 `src/lib/k8s/**`、`src/lib/ai/**` 迁入 `packages/domain-k8s` 与 `packages/domain-ai`。  
+  - [x]  新建 `packages/infra-http` 提供 fetch/错误协议、`packages/ui-kit` 抽取共享 UI。  
+  - [x]  配置 TS path alias + lint 规则，禁止跨包引用内部实现。  
+  - [x]  在 `services/` 下创建 `core-api`、`ai-orchestrator` 占位（stub），确保 domain 包可直接复用。
 
 - [ ]  **可观测性与审计底座**  
-  - [ ]  收集 `/api/k8s/*`、`/api/ai/*` 请求日志、OperationPlan 状态流转，持久化到 Prisma。  
-  - [ ]  为 prompt 执行、plan 执行添加基础 metrics（成功率、失败原因分布）。  
-  - [ ]  提供最小的日志/metrics 导出能力（例如 OpenTelemetry stub），为后续 SLO 模块铺路。
+  - [x]  收集 `/api/k8s/*`、`/api/ai/*` 请求日志、OperationPlan 状态流转，持久化到 Prisma。  
+  - [x]  为 prompt 执行、plan 执行添加基础 metrics（成功率、失败原因分布）。  
+  - [x]  提供最小的日志/metrics 导出能力（例如 OpenTelemetry stub），为后续 SLO 模块铺路。
 
-- **阶段成果**：用户可以安全地通过自然语言提交受控写操作；OperationPlan、Prompt Registry、审计、模块化边界全部落地，为 Phase 3 的智能化与服务化打下地基。
+- **阶段成果（当前进展）**：命令面板、PlanConfirmModal 与风险引擎支撑的最小写路径已闭环；Prompt Registry、Workspace 拆分与观测持久化仍在排期中，需在落地后再宣告 Phase 2 退出。
 - **退出标准**:
   - 命令面板支持查询与至少一种写操作（如重启 Deployment），执行链路经过 PlanConfirmModal 审批。
   - OperationPlan 以 `resourceVersion`/`idempotencyKey` 执行成功，审计记录完整，风险分级生效。
@@ -711,11 +789,11 @@ contextBuilder → promptLoader → LLM call → ZodValidator → RiskAnnotator
 
 - [ ]  **UI 协作升级**  
   - [ ]  资源详情页引入 AI 辅助侧栏（诊断、建议、回放），支持拖拽插入 Plan。  
-  - [ ]  YAML Copilot 采用分屏布局（编辑区 + AI 面板），支持提示、改写、预览对比。  
+- [x]  YAML Copilot 采用分屏布局（编辑区 + AI 面板），支持提示、改写、预览对比。  
   - [ ]  拓扑图提供交互式提示：节点悬浮信息卡、Plan 影响范围高亮、一步跳转到相关详情。
 
 - [ ]  **YAML Copilot + 多步骤 OperationPlan**  
-  - [ ]  集成 Monaco Editor + AI 面板，支持解释、Best Practice 检查、生成补丁。  
+- [x]  集成 Monaco Editor + AI 面板，支持解释、Best Practice 检查、生成补丁。  
   - [ ]  AI 建议落地为 `steps[]` 多步骤 OperationPlan，每步可附带 `rollbackPatch`。  
   - [ ]  PlanConfirmModal 支持步骤查看、回滚策略提示，并记录执行前/后的 telemetry。
 

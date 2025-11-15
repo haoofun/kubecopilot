@@ -4,13 +4,13 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { Loader2, Search } from 'lucide-react'
 
-import { Input } from '@/components/ui/input'
-import { Badge } from '@/components/ui/badge'
+import { Input } from '@ui-kit/input'
+import { Badge } from '@ui-kit/badge'
 import { cn } from '@/lib/utils'
 import type {
   GlobalSearchResponse,
   GlobalSearchResult,
-} from '@/lib/k8s/types/search'
+} from '@domain-k8s/types/search'
 
 const MIN_QUERY_LENGTH = 2
 const DEBOUNCE_DELAY = 250

@@ -1,0 +1,59 @@
+[
+  {
+    "id": "diagnose-pod",
+    "version": "1.0.0",
+    "description": "Diagnose Kubernetes pod health issues using describe, events, and log context.",
+    "templatePath": "diagnose-pod.md",
+    "model": "gpt-4o-mini",
+    "temperature": 0.2,
+    "maxTokens": 1200,
+    "owner": "platform-ai",
+    "reviewedBy": ["sre-lead"],
+    "lastReviewedAt": "2024-12-01T00:00:00Z",
+    "riskTier": "low",
+    "category": "diagnostics",
+    "inputSchemaRef": "packages/domain-ai/src/diagnose-pod.ts#PodDiagnosisContext",
+    "outputSchemaRef": "packages/domain-ai/src/schemas/diagnosis.ts#PodDiagnosisSchema",
+    "rollout": {
+      "strategy": "general-availability",
+      "stages": [
+        {
+          "stage": "ga",
+          "percent": 100,
+          "conditions": ["read-only-path"]
+        }
+      ]
+    }
+  },
+  {
+    "id": "yaml-copilot",
+    "version": "0.1.0",
+    "description": "Assist with editing Kubernetes YAML manifests by explaining, checking best practices, or planning safe changes.",
+    "templatePath": "yaml-copilot.md",
+    "model": "gpt-4o-mini",
+    "temperature": 0.2,
+    "maxTokens": 1600,
+    "owner": "platform-ai",
+    "reviewedBy": ["sre-lead"],
+    "lastReviewedAt": "2024-12-10T00:00:00Z",
+    "riskTier": "medium",
+    "category": "copilot",
+    "inputSchemaRef": "packages/domain-ai/src/yaml-copilot.ts#YamlCopilotContext",
+    "outputSchemaRef": "packages/domain-ai/src/schemas/yaml-copilot.ts#YamlCopilotResponseSchema",
+    "rollout": {
+      "strategy": "general-availability",
+      "stages": [
+        {
+          "stage": "pilot",
+          "percent": 50,
+          "conditions": ["plan-mode-only"]
+        },
+        {
+          "stage": "ga",
+          "percent": 100,
+          "conditions": ["requires-human-approval"]
+        }
+      ]
+    }
+  }
+]

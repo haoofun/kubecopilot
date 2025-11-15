@@ -3,9 +3,9 @@
 import React from 'react'
 import Link from 'next/link'
 
-import { Alert, AlertDescription } from '@/components/ui/alert'
-import { Button } from '@/components/ui/button'
-import { Skeleton } from '@/components/ui/skeleton'
+import { Alert, AlertDescription } from '@ui-kit/alert'
+import { Button } from '@ui-kit/button'
+import { Skeleton } from '@ui-kit/skeleton'
 import {
   Table,
   TableBody,
@@ -13,7 +13,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table'
+} from '@ui-kit/table'
 
 export interface ColumnDef<T> {
   header: string
